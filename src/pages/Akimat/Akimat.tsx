@@ -161,7 +161,7 @@ export default function AkimatDashboard() {
                 </div>
               </CardTitle>
             </CardHeader>
-            <CardContent className="p-0 h-[350px]">
+            <CardContent className="p-0 h-[430px]">
               <AkimatMap />
             </CardContent>
           </Card>
@@ -280,4 +280,3 @@ export default function AkimatDashboard() {
     </div>
   )
 }
-
