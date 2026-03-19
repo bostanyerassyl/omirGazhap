@@ -1,12 +1,10 @@
-import { useMemo } from "react"
+import { InteractiveMapView } from "@/components/map/interactive-map-view"
 import { Building2, CheckCircle2, Clock, AlertCircle } from "lucide-react"
 import type { ConstructionObject } from "@/types/dashboard"
-import { MapboxMap } from "@/map/react/mapbox-map"
 
 interface DeveloperMapProps {
   objects: ConstructionObject[]
   selectedObject?: ConstructionObject
-  onSelectObject: (obj: ConstructionObject) => void
 }
 
 const statusColors: Record<ConstructionObject["status"], string> = {
@@ -23,38 +21,12 @@ const statusIcons = {
   delayed: AlertCircle,
 }
 
-const statusEmoji: Record<ConstructionObject["status"], string> = {
-  planning: "📐",
-  "in-progress": "🚧",
-  completed: "✅",
-  delayed: "⏳",
-}
-
-export function DeveloperMap({ objects, selectedObject, onSelectObject }: DeveloperMapProps) {
-  const center: [number, number] = selectedObject
-    ? [selectedObject.coordinates.lng, selectedObject.coordinates.lat]
-    : [76.95, 43.24]
-
-  const markers = useMemo(
-    () =>
-      objects.map((obj) => ({
-        id: obj.id,
-        lng: obj.coordinates.lng,
-        lat: obj.coordinates.lat,
-        color: statusColors[obj.status],
-        iconHtml: statusEmoji[obj.status],
-        title: obj.name,
-        pulse: selectedObject?.id === obj.id,
-        onClick: () => onSelectObject(obj),
-      })),
-    [objects, onSelectObject, selectedObject?.id],
-  )
-
+export function DeveloperMap({ objects, selectedObject }: DeveloperMapProps) {
   return (
     <div className="absolute inset-0 bg-background">
-      <MapboxMap className="absolute inset-0" center={center} zoom={13} markers={markers} />
+      <InteractiveMapView toolbarTop={132} />
 
-      <div className="absolute bottom-24 right-4 z-10 rounded-lg border border-border bg-card/90 p-3 backdrop-blur-sm">
+      <div className="absolute bottom-24 right-4 z-20 rounded-lg border border-border bg-card/90 p-3 backdrop-blur-sm">
         <h4 className="mb-2 text-xs font-medium text-foreground">Status Legend</h4>
         <div className="space-y-1.5">
           {Object.entries(statusColors).map(([status, color]) => {
@@ -70,7 +42,7 @@ export function DeveloperMap({ objects, selectedObject, onSelectObject }: Develo
         </div>
       </div>
 
-      <div className="absolute right-4 top-20 z-10 rounded-lg border border-border bg-card/90 p-4 backdrop-blur-sm">
+      <div className="absolute right-4 top-20 z-20 rounded-lg border border-border bg-card/90 p-4 backdrop-blur-sm">
         <h4 className="mb-3 text-sm font-medium text-foreground">Project Overview</h4>
         <div className="space-y-2">
           <div className="flex items-center justify-between gap-4">
@@ -99,7 +71,7 @@ export function DeveloperMap({ objects, selectedObject, onSelectObject }: Develo
       </div>
 
       {selectedObject && (
-        <div className="absolute bottom-4 left-4 z-10 max-w-sm rounded-lg border border-border bg-card/95 p-4 backdrop-blur-sm">
+        <div className="absolute bottom-4 left-4 z-20 max-w-sm rounded-lg border border-border bg-card/95 p-4 backdrop-blur-sm">
           <div className="mb-2 flex items-center gap-2">
             <div className="rounded p-2" style={{ backgroundColor: `${statusColors[selectedObject.status]}33` }}>
               <Building2 className="h-4 w-4" style={{ color: statusColors[selectedObject.status] }} />
