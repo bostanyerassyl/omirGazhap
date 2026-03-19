@@ -141,7 +141,7 @@ dom.bannerUpload.addEventListener('change', async e => {
     dom.bannerImg.style.opacity = '1';
 
     if (error) {
-        console.error('Upload failed:', error.message);
+        console.error('Upload failed (bucket=building_images):', error.message);
         setActiveBanner(null);
         renderBanner();
         e.target.value = '';
@@ -154,9 +154,20 @@ dom.bannerUpload.addEventListener('change', async e => {
 
     // Auto-save image immediately so re-fetching doesn't revert it
     if (activeContext.type === 'building') {
-        await supabase.from('Building Data').upsert({ key: activeContext.key, image: activeBanner });
+        const { error: dbError } = await supabase
+            .from('Building Data')
+            .upsert({ key: activeContext.key, image: activeBanner });
+        if (dbError) {
+            console.error('Building image DB save failed:', dbError.message);
+        }
     } else if (activeContext.type === 'feature') {
-        await supabase.from('Map Features').update({ image: activeBanner }).eq('id', activeContext.id);
+        const { error: dbError } = await supabase
+            .from('Map Features')
+            .update({ image: activeBanner })
+            .eq('id', activeContext.id);
+        if (dbError) {
+            console.error('Feature image DB save failed:', dbError.message);
+        }
     }
 
     e.target.value = '';

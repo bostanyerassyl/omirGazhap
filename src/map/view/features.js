@@ -10,8 +10,20 @@ import {
 export let activeFeature = null;
 export let activeDraw    = null;
 
-const CAN_WRITE_OBSERVATIONS = new Set(['utilities', 'developer', 'industrialist', 'admin', 'akimat']);
+const CAN_WRITE_OBSERVATIONS = new Set([
+  'utilities',
+  'developer',
+  'industrialist',
+  'admin',
+  'akimat',
+  'government_official',
+]);
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const ROLE_ALIASES = {
+  resident: 'user',
+  'government-official': 'government_official',
+  governmentOfficial: 'government_official',
+};
 
 function isUuid(value) {
   return UUID_RE.test(String(value ?? '').trim());
@@ -19,12 +31,13 @@ function isUuid(value) {
 
 function getCurrentRole() {
   const fromDataset = document.getElementById('map')?.dataset?.role;
-  if (fromDataset) return fromDataset;
+  if (fromDataset) return ROLE_ALIASES[fromDataset] ?? fromDataset;
   try {
     const raw = window.localStorage.getItem('auth.snapshot');
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    return parsed?.role ?? null;
+    const rawRole = parsed?.role ?? null;
+    return rawRole ? (ROLE_ALIASES[rawRole] ?? rawRole) : null;
   } catch {
     return null;
   }
@@ -346,12 +359,8 @@ async function setupObservationsUI({ feature, dbId, role }) {
   const assetHintEl = document.getElementById('observation-asset-hint');
   const saveBtn = document.getElementById('observation-save');
   const refreshBtn = document.getElementById('observation-refresh');
-  if (!section || !list || !form || !roleHint || !assetInput || !saveBtn || !refreshBtn || !assetHintEl) return;
-
-  if (feature.geometry.type !== 'Point') {
-    section.style.display = 'none';
-    return;
-  }
+  const fields = document.getElementById('observation-fields');
+  if (!section || !list || !form || !roleHint || !assetInput || !saveBtn || !refreshBtn || !assetHintEl || !fields) return;
 
   section.style.display = '';
   const initialAssetId = feature.properties?.asset_id || '';
@@ -389,14 +398,18 @@ async function setupObservationsUI({ feature, dbId, role }) {
 
   const canWrite = CAN_WRITE_OBSERVATIONS.has(role ?? '');
   if (!canWrite) {
-    form.style.display = 'none';
+    form.style.display = '';
+    fields.style.display = 'none';
+    saveBtn.style.display = 'none';
     roleHint.textContent = role
-      ? `${assetHint} Role "${role}" can view observations on points but cannot add new data.`.trim()
-      : 'Sign in with a data-operator role to add observations.';
+      ? `${assetHint} Role "${role}" can load observations but cannot add new data.`.trim()
+      : 'Sign in with a data-operator role to add observations. Loading is available.';
     return;
   }
 
   form.style.display = '';
+  fields.style.display = '';
+  saveBtn.style.display = '';
   roleHint.textContent = role === 'akimat'
     ? `${assetHint} Government official mode enabled: you can submit official utility observations.`.trim()
     : `${assetHint} Role "${role}" data entry mode enabled.`.trim();
