@@ -16,6 +16,14 @@ export type SignInPayload = {
   password: string
 }
 
+function serializeSignUpRole(role: SignUpPayload['role']) {
+  if (role === 'user') {
+    return 'resident'
+  }
+
+  return role
+}
+
 function toSessionData(
   session: Session | null,
   userOverride?: User | null,
@@ -49,7 +57,7 @@ export async function signUp({
       options: {
         data: {
           full_name: fullName,
-          role,
+          role: serializeSignUpRole(role),
         },
       },
     })

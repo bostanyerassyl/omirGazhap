@@ -120,23 +120,6 @@ function caseStatusToAdminStatus(
   }
 }
 
-function roleLabel(role: Role | null) {
-  switch (role) {
-    case 'developer':
-      return 'Developer'
-    case 'industrialist':
-      return 'Industrialist'
-    case 'utilities':
-      return 'Utilities'
-    case 'akimat':
-      return 'Akimat'
-    case 'admin':
-      return 'Admin'
-    default:
-      return 'Resident'
-  }
-}
-
 function actorName(
   profilesMap: Record<string, Profile>,
   userId: string | null,
@@ -347,21 +330,19 @@ async function buildDashboardData(
 ): Promise<AuthResult<DashboardData>> {
   const emptyData = createEmptyDashboardData()
 
-  const [eventsResult, casesResult, assetsResult, observationsResult, totalUsersResult] =
+  const [eventsResult, casesResult, assetsResult, observationsResult] =
     await Promise.all([
       eventService.list(role, userId),
       caseService.list(role, userId),
       assetService.list(role, userId),
       observationService.list(role, userId),
-      countProfiles(),
     ])
 
   const firstError =
     eventsResult.error ||
     casesResult.error ||
     assetsResult.error ||
-    observationsResult.error ||
-    totalUsersResult.error
+    observationsResult.error
 
   if (firstError) {
     return {
@@ -374,11 +355,16 @@ async function buildDashboardData(
   const cases = casesResult.data ?? []
   const assets = assetsResult.data ?? []
   const observations = observationsResult.data ?? []
-  const totalUsers = totalUsersResult.data ?? 0
-  const actorProfilesResult = await loadActorProfiles([
-    ...cases.map((item) => item.createdBy),
-    ...observations.map((item) => item.createdBy),
-  ])
+  const shouldLoadAdminProfiles = role === 'admin'
+  const shouldLoadTotalUsers = role === 'admin'
+  const shouldLoadCurrentProfile = role === 'industrialist' && Boolean(userId)
+
+  const actorProfilesResult = shouldLoadAdminProfiles
+    ? await loadActorProfiles([
+        ...cases.map((item) => item.createdBy),
+        ...observations.map((item) => item.createdBy),
+      ])
+    : { data: {}, error: null }
 
   if (actorProfilesResult.error) {
     return {
@@ -387,8 +373,20 @@ async function buildDashboardData(
     }
   }
 
-  const profilesMap = actorProfilesResult.data ?? {}
-  const currentProfileResult = userId ? await getProfile(userId) : { data: null, error: null }
+  const totalUsersResult = shouldLoadTotalUsers
+    ? await countProfiles()
+    : { data: 0, error: null }
+
+  if (totalUsersResult.error) {
+    return {
+      data: emptyData,
+      error: totalUsersResult.error,
+    }
+  }
+
+  const currentProfileResult = shouldLoadCurrentProfile && userId
+    ? await getProfile(userId)
+    : { data: null, error: null }
 
   if (currentProfileResult.error) {
     return {
@@ -396,6 +394,9 @@ async function buildDashboardData(
       error: currentProfileResult.error,
     }
   }
+
+  const profilesMap = actorProfilesResult.data ?? {}
+  const totalUsers = totalUsersResult.data ?? 0
 
   return {
     data: {

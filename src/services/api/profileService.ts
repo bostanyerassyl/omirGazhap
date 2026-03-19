@@ -18,6 +18,22 @@ function normalizeRole(role: ProfileDbRole | null): Role | null {
   return role
 }
 
+function serializeRole(role: Role | null | undefined): ProfileDbRole | null | undefined {
+  if (role === undefined) {
+    return undefined
+  }
+
+  if (role === null) {
+    return null
+  }
+
+  if (role === 'user') {
+    return 'resident'
+  }
+
+  return role
+}
+
 function normalizeProfile(record: ProfileRecord): Profile {
   return {
     id: record.id,
@@ -39,7 +55,7 @@ function serializeProfileInput(data: ProfileCreateInput | ProfileUpdateInput) {
   const payload: Partial<ProfileRecord> = {}
 
   if (data.fullName !== undefined) payload.full_name = data.fullName
-  if (data.role !== undefined) payload.role = data.role
+  if (data.role !== undefined) payload.role = serializeRole(data.role)
   if (data.phone !== undefined) payload.phone = data.phone
   if (data.address !== undefined) payload.address = data.address
   if (data.bio !== undefined) payload.bio = data.bio

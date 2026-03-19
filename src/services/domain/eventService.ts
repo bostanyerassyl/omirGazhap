@@ -12,7 +12,7 @@ type EventRecord = {
   title: string | null
   description: string | null
   event_type: string | null
-  severity: EventSeverity | null
+  severity: number | null
   starts_at: string | null
   ends_at: string | null
   is_public: boolean | null
@@ -21,6 +21,26 @@ type EventRecord = {
   locations?: {
     name: string | null
   } | null
+}
+
+function normalizeSeverity(severity: number | null): EventSeverity {
+  if (severity === null) {
+    return 'medium'
+  }
+
+  if (severity <= 1) {
+    return 'low'
+  }
+
+  if (severity === 2) {
+    return 'medium'
+  }
+
+  if (severity === 3) {
+    return 'high'
+  }
+
+  return 'critical'
 }
 
 function mapEvent(record: EventRecord): EventItem {
@@ -33,7 +53,7 @@ function mapEvent(record: EventRecord): EventItem {
     title: record.title ?? record.event_type ?? 'Event',
     description: record.description ?? '',
     eventType: record.event_type ?? 'general',
-    severity: record.severity ?? 'medium',
+    severity: normalizeSeverity(record.severity),
     startsAt: record.starts_at,
     endsAt: record.ends_at,
     isPublic: record.is_public ?? false,
