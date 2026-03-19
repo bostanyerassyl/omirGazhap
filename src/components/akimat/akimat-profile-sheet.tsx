@@ -1,23 +1,27 @@
-import { useEffect, useState } from "react"
-import { Camera, Mail, Phone, MapPin, Save, User } from "lucide-react"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { StatusMessage } from "@/components/ui/status-message"
-import { Textarea } from "@/components/ui/textarea"
+import { useEffect, useState } from 'react'
+import { Camera, Mail, MapPin, Phone, Save, User } from 'lucide-react'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { StatusMessage } from '@/components/ui/status-message'
+import { Textarea } from '@/components/ui/textarea'
 import {
   Sheet,
   SheetContent,
   SheetDescription,
   SheetHeader,
   SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet"
-import { useAuth } from "@/features/auth/model/AuthProvider"
-import { storageService } from "@/services/domain/storageService"
+} from '@/components/ui/sheet'
+import { useAuth } from '@/features/auth/model/AuthProvider'
+import { storageService } from '@/services/domain/storageService'
 
-interface UserProfile {
+type AkimatProfileSheetProps = {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+}
+
+type AkimatProfileForm = {
   name: string
   email: string
   phone: string
@@ -26,21 +30,24 @@ interface UserProfile {
   avatar: string
 }
 
-export function ProfileSheet() {
+export function AkimatProfileSheet({
+  open,
+  onOpenChange,
+}: AkimatProfileSheetProps) {
   const { user, profile: authProfile, updateEmail, updateProfile } = useAuth()
-  const [profile, setProfile] = useState<UserProfile>({
-    name: "Citizen User",
-    email: "user@alatau.city",
-    phone: "+7 (700) 123-4567",
-    address: "Alatau District, Block 5",
-    bio: "Resident of Alatau Smart City",
-    avatar: ""
-  })
   const [isEditing, setIsEditing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null)
-  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false)
+  const [profile, setProfile] = useState<AkimatProfileForm>({
+    name: 'Akimat Administrator',
+    email: 'admin@alatau.gov.kz',
+    phone: '',
+    address: '',
+    bio: '',
+    avatar: '',
+  })
 
   useEffect(() => {
     if (!authProfile) {
@@ -57,8 +64,8 @@ export function ProfileSheet() {
     })
   }, [authProfile])
 
-  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
+  const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
 
     if (!file || !user) {
       return
@@ -71,16 +78,16 @@ export function ProfileSheet() {
     const uploadResult = await storageService.uploadAvatar(user.id, file)
 
     setIsUploadingAvatar(false)
-    e.target.value = ''
+    event.target.value = ''
 
     if (uploadResult.error) {
       setSaveError(uploadResult.error.message)
       return
     }
 
-    setProfile((prev) => ({
-      ...prev,
-      avatar: uploadResult.data ?? prev.avatar,
+    setProfile((current) => ({
+      ...current,
+      avatar: uploadResult.data ?? current.avatar,
     }))
     setSaveSuccess('Avatar uploaded. Save the profile to persist the change.')
   }
@@ -89,6 +96,7 @@ export function ProfileSheet() {
     setIsSaving(true)
     setSaveError(null)
     setSaveSuccess(null)
+
     const emailChanged = profile.email !== (authProfile?.email ?? '')
 
     if (emailChanged) {
@@ -108,6 +116,7 @@ export function ProfileSheet() {
       bio: profile.bio,
       avatarUrl: profile.avatar,
     })
+
     setIsSaving(false)
 
     if (result.error) {
@@ -124,53 +133,49 @@ export function ProfileSheet() {
   }
 
   return (
-    <Sheet>
-      <SheetTrigger asChild>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="flex items-center gap-2 px-2 hover:bg-secondary"
-        >
-          <Avatar className="size-8 border-2 border-accent">
-            <AvatarImage src={profile.avatar} alt={profile.name} />
-            <AvatarFallback className="bg-secondary text-foreground text-xs">
-              {profile.name.split(' ').map(n => n[0]).join('')}
-            </AvatarFallback>
-          </Avatar>
-          <span className="hidden md:inline text-sm font-medium">{profile.name}</span>
-        </Button>
-      </SheetTrigger>
-      <SheetContent side="left" className="w-full sm:max-w-md bg-card border-border overflow-y-auto">
+    <Sheet
+      open={open}
+      onOpenChange={(nextOpen) => {
+        onOpenChange(nextOpen)
+        if (!nextOpen) {
+          setIsEditing(false)
+          setSaveError(null)
+          setSaveSuccess(null)
+        }
+      }}
+    >
+      <SheetContent side="left" className="w-full sm:max-w-md overflow-y-auto">
         <SheetHeader className="text-left">
-          <SheetTitle className="text-foreground">My Profile</SheetTitle>
-          <SheetDescription className="text-muted-foreground">
-            Manage your personal information
+          <SheetTitle>Akimat Profile</SheetTitle>
+          <SheetDescription>
+            Manage your administrator profile information.
           </SheetDescription>
         </SheetHeader>
-        
-        <div className="mt-6 space-y-6">
-          {saveError ? (
-            <StatusMessage tone="error">{saveError}</StatusMessage>
-          ) : null}
-          {saveSuccess ? (
-            <StatusMessage tone="success">{saveSuccess}</StatusMessage>
-          ) : null}
-          {/* Avatar section */}
+
+        <div className="mt-4 space-y-6 px-4 pb-6">
+          {saveError ? <StatusMessage tone="error">{saveError}</StatusMessage> : null}
+          {saveSuccess ? <StatusMessage tone="success">{saveSuccess}</StatusMessage> : null}
+
           <div className="flex flex-col items-center gap-4">
             <div className="relative">
               <Avatar className="size-24 border-4 border-accent">
                 <AvatarImage src={profile.avatar} alt={profile.name} />
                 <AvatarFallback className="bg-secondary text-foreground text-2xl">
-                  {profile.name.split(' ').map(n => n[0]).join('')}
+                  {profile.name
+                    .split(' ')
+                    .map((part) => part[0])
+                    .join('')
+                    .slice(0, 2)
+                    .toUpperCase()}
                 </AvatarFallback>
               </Avatar>
-              <label 
-                htmlFor="avatar-upload"
+              <label
+                htmlFor="akimat-avatar-upload"
                 className="absolute bottom-0 right-0 flex items-center justify-center size-8 rounded-full bg-accent text-accent-foreground cursor-pointer hover:bg-accent/90 transition-colors"
               >
                 <Camera className="size-4" />
                 <input
-                  id="avatar-upload"
+                  id="akimat-avatar-upload"
                   type="file"
                   accept="image/*"
                   className="sr-only"
@@ -185,85 +190,88 @@ export function ProfileSheet() {
             </p>
           </div>
 
-          {/* Profile form */}
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="name" className="text-foreground flex items-center gap-2">
+              <Label htmlFor="akimat-name" className="flex items-center gap-2">
                 <User className="size-4 text-accent" />
                 Full Name
               </Label>
               <Input
-                id="name"
+                id="akimat-name"
                 value={profile.name}
-                onChange={(e) => setProfile(prev => ({ ...prev, name: e.target.value }))}
+                onChange={(event) =>
+                  setProfile((current) => ({ ...current, name: event.target.value }))
+                }
                 disabled={!isEditing}
-                className="bg-secondary border-border text-foreground"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="email" className="text-foreground flex items-center gap-2">
+              <Label htmlFor="akimat-email" className="flex items-center gap-2">
                 <Mail className="size-4 text-accent" />
                 Email
               </Label>
               <Input
-                id="email"
+                id="akimat-email"
                 type="email"
                 value={profile.email}
-                onChange={(e) => setProfile(prev => ({ ...prev, email: e.target.value }))}
+                onChange={(event) =>
+                  setProfile((current) => ({ ...current, email: event.target.value }))
+                }
                 disabled={!isEditing}
-                className="bg-secondary border-border text-foreground"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="phone" className="text-foreground flex items-center gap-2">
+              <Label htmlFor="akimat-phone" className="flex items-center gap-2">
                 <Phone className="size-4 text-accent" />
                 Phone
               </Label>
               <Input
-                id="phone"
-                type="tel"
+                id="akimat-phone"
                 value={profile.phone}
-                onChange={(e) => setProfile(prev => ({ ...prev, phone: e.target.value }))}
+                onChange={(event) =>
+                  setProfile((current) => ({ ...current, phone: event.target.value }))
+                }
                 disabled={!isEditing}
-                className="bg-secondary border-border text-foreground"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="address" className="text-foreground flex items-center gap-2">
+              <Label htmlFor="akimat-address" className="flex items-center gap-2">
                 <MapPin className="size-4 text-accent" />
                 Address
               </Label>
               <Input
-                id="address"
+                id="akimat-address"
                 value={profile.address}
-                onChange={(e) => setProfile(prev => ({ ...prev, address: e.target.value }))}
+                onChange={(event) =>
+                  setProfile((current) => ({ ...current, address: event.target.value }))
+                }
                 disabled={!isEditing}
-                className="bg-secondary border-border text-foreground"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="bio" className="text-foreground">About Me</Label>
+              <Label htmlFor="akimat-bio">About</Label>
               <Textarea
-                id="bio"
+                id="akimat-bio"
                 value={profile.bio}
-                onChange={(e) => setProfile(prev => ({ ...prev, bio: e.target.value }))}
+                onChange={(event) =>
+                  setProfile((current) => ({ ...current, bio: event.target.value }))
+                }
                 disabled={!isEditing}
-                className="bg-secondary border-border text-foreground min-h-[100px] resize-none"
+                className="min-h-[110px] resize-none"
               />
             </div>
           </div>
 
-          {/* Action buttons */}
           <div className="flex gap-3">
             {isEditing ? (
               <>
-                <Button 
-                  variant="outline" 
-                  className="flex-1 border-border text-foreground hover:bg-secondary"
+                <Button
+                  variant="outline"
+                  className="flex-1"
                   onClick={() => {
                     setIsEditing(false)
                     setSaveError(null)
@@ -272,9 +280,9 @@ export function ProfileSheet() {
                 >
                   Cancel
                 </Button>
-                <Button 
-                  className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90"
-                  onClick={handleSave}
+                <Button
+                  className="flex-1"
+                  onClick={() => void handleSave()}
                   disabled={isSaving || isUploadingAvatar}
                 >
                   <Save className="size-4 mr-2" />
@@ -282,10 +290,7 @@ export function ProfileSheet() {
                 </Button>
               </>
             ) : (
-              <Button 
-                className="w-full bg-accent text-accent-foreground hover:bg-accent/90"
-                onClick={() => setIsEditing(true)}
-              >
+              <Button className="w-full" onClick={() => setIsEditing(true)}>
                 Edit Profile
               </Button>
             )}
@@ -295,4 +300,3 @@ export function ProfileSheet() {
     </Sheet>
   )
 }
-

@@ -11,13 +11,17 @@ export let activeFeature = null;
 export let activeDraw    = null;
 const DEFAULT_FEATURE_COLOR = '#e74c3c';
 const drawIdToDbId = new Map();
+const knownAssetIds = new Set();
+const missingAssetIds = new Set();
+let assetsAccessBlocked = false;
+let observationsAccessBlocked = false;
 const DRAW_STYLES = [
   {
     id: 'gl-draw-polygon-fill',
     type: 'fill',
     filter: ['all', ['==', '$type', 'Polygon'], ['!=', 'mode', 'static']],
     paint: {
-      'fill-color': ['coalesce', ['get', 'color'], DEFAULT_FEATURE_COLOR],
+      'fill-color': ['coalesce', ['get', 'user_color'], ['get', 'color'], DEFAULT_FEATURE_COLOR],
       'fill-opacity': 0.25,
     },
   },
@@ -26,7 +30,7 @@ const DRAW_STYLES = [
     type: 'line',
     filter: ['all', ['==', '$type', 'Polygon'], ['!=', 'mode', 'static']],
     paint: {
-      'line-color': ['coalesce', ['get', 'color'], DEFAULT_FEATURE_COLOR],
+      'line-color': ['coalesce', ['get', 'user_color'], ['get', 'color'], DEFAULT_FEATURE_COLOR],
       'line-width': 2,
     },
   },
@@ -35,7 +39,7 @@ const DRAW_STYLES = [
     type: 'line',
     filter: ['all', ['==', '$type', 'LineString'], ['!=', 'mode', 'static']],
     paint: {
-      'line-color': ['coalesce', ['get', 'color'], DEFAULT_FEATURE_COLOR],
+      'line-color': ['coalesce', ['get', 'user_color'], ['get', 'color'], DEFAULT_FEATURE_COLOR],
       'line-width': 3,
     },
   },
@@ -45,7 +49,7 @@ const DRAW_STYLES = [
     filter: ['all', ['==', '$type', 'Point'], ['!=', 'meta', 'midpoint'], ['!=', 'mode', 'static']],
     paint: {
       'circle-radius': 6,
-      'circle-color': ['coalesce', ['get', 'color'], DEFAULT_FEATURE_COLOR],
+      'circle-color': ['coalesce', ['get', 'user_color'], ['get', 'color'], DEFAULT_FEATURE_COLOR],
       'circle-stroke-color': '#ffffff',
       'circle-stroke-width': 1.5,
     },
@@ -118,6 +122,144 @@ function resolveFeatureDbId(feature) {
   return null;
 }
 
+function safeSetFeatureProperty(draw, featureId, key, value) {
+  if (!draw || !featureId) return;
+  try {
+    const exists = draw.get(featureId);
+    if (!exists) return;
+    draw.setFeatureProperty(featureId, key, value);
+  } catch {
+    // Draw internals can race during rapid mode changes; skip noisy runtime crash.
+  }
+}
+
+function toErrorText(error) {
+  if (!error) return 'Unknown error';
+  const parts = [error.message];
+  if (error.code) parts.push(`code=${error.code}`);
+  if (error.details) parts.push(`details=${error.details}`);
+  if (error.hint) parts.push(`hint=${error.hint}`);
+  return parts.filter(Boolean).join(' | ');
+}
+
+async function ensureAssetRecordExists(assetId) {
+  if (!assetId || !isUuid(assetId)) return false;
+  if (knownAssetIds.has(assetId)) return true;
+  if (missingAssetIds.has(assetId)) return false;
+  if (assetsAccessBlocked) return false;
+
+  const existing = await supabase
+    .from('assets')
+    .select('id')
+    .eq('id', assetId)
+    .maybeSingle();
+
+  if (existing.error) {
+    if (existing.error.code === '42501' || /permission|forbidden|not allowed/i.test(existing.error.message ?? '')) {
+      assetsAccessBlocked = true;
+      console.warn('Assets table access is blocked by RLS. Disabling further asset existence checks to prevent UI stutter.');
+      return false;
+    }
+    console.error('assets lookup error:', toErrorText(existing.error));
+    return false;
+  }
+  if (existing.data?.id) {
+    knownAssetIds.add(assetId);
+    return true;
+  }
+
+  // Try a small sequence of payloads to match varying assets schemas.
+  const candidates = [
+    { id: assetId },
+    { id: assetId, type: 'generic' },
+    { id: assetId, type: 'generic', status: 'active' },
+  ];
+
+  for (const payload of candidates) {
+    const res = await supabase.from('assets').insert([payload]);
+    if (!res.error) {
+      knownAssetIds.add(assetId);
+      return true;
+    }
+    // If another request created it first, treat as success.
+    if (res.error.code === '23505') {
+      knownAssetIds.add(assetId);
+      return true;
+    }
+    if (res.error.code === '42501' || /permission|forbidden|not allowed/i.test(res.error.message ?? '')) {
+      assetsAccessBlocked = true;
+      console.warn('Assets table insert is blocked by RLS. Disabling further asset provisioning attempts.');
+      return false;
+    }
+    console.error('assets insert candidate failed:', toErrorText(res.error), 'payload=', payload);
+  }
+
+  const fallback = await supabase
+    .from('assets')
+    .select('id')
+    .eq('id', assetId)
+    .maybeSingle();
+  if (fallback.data?.id) {
+    knownAssetIds.add(assetId);
+    return true;
+  }
+  if (fallback.error) {
+    if (fallback.error.code === '42501' || /permission|forbidden|not allowed/i.test(fallback.error.message ?? '')) {
+      assetsAccessBlocked = true;
+      console.warn('Assets table access is blocked by RLS. Disabling further asset checks.');
+      return false;
+    }
+    console.error('assets final lookup error:', toErrorText(fallback.error));
+  }
+  missingAssetIds.add(assetId);
+  return false;
+}
+
+async function ensurePointAssetId(feature, dbId = null) {
+  if (feature?.geometry?.type !== 'Point') return feature?.properties?.asset_id ?? null;
+  const coordKey = getCoordKey(feature.geometry);
+  if (!coordKey) return feature?.properties?.asset_id ?? null;
+
+  if (dbId) {
+    const byId = await supabase
+      .from('Map Features')
+      .select('id, asset_id')
+      .eq('id', dbId)
+      .maybeSingle();
+    if (byId.error) {
+      console.error('ensurePointAssetId by-id lookup error:', byId.error.message);
+    } else if (byId.data?.asset_id && isUuid(byId.data.asset_id)) {
+      feature.properties = { ...(feature.properties ?? {}), asset_id: byId.data.asset_id };
+      return byId.data.asset_id;
+    }
+  }
+
+  const current = feature?.properties?.asset_id;
+  if (current && isUuid(current)) return current;
+
+  let query = supabase
+    .from('Map Features')
+    .select('id, asset_id')
+    .eq('coord_key', coordKey)
+    .not('asset_id', 'is', null)
+    .limit(1);
+
+  if (dbId) query = query.neq('id', dbId);
+  const { data, error } = await query.maybeSingle();
+  if (error) {
+    console.error('ensurePointAssetId lookup error:', error.message);
+  }
+
+  const nextAssetId = data?.asset_id || crypto.randomUUID();
+  feature.properties = { ...(feature.properties ?? {}), asset_id: nextAssetId };
+
+  // Best-effort assets provisioning only; does not null-out sticky feature asset_id.
+  if (!assetsAccessBlocked) {
+    void ensureAssetRecordExists(nextAssetId);
+  }
+  return nextAssetId;
+}
+
 function getCurrentRole() {
   const fromDataset = document.getElementById('map')?.dataset?.role;
   if (fromDataset) return ROLE_ALIASES[fromDataset] ?? fromDataset;
@@ -175,10 +317,31 @@ export async function loadFeatures() {
 }
 
 export async function saveFeature(feature) {
-  const id = resolveFeatureDbId(feature);
+  let id = resolveFeatureDbId(feature);
   if (!id) { console.error('saveFeature: no id'); return; }
+  const coordKey = getCoordKey(feature.geometry);
+
+  // If a point already exists at this coord_key, update that row instead of creating duplicate.
+  if (feature.geometry?.type === 'Point' && coordKey) {
+    const existingAtCoord = await supabase
+      .from('Map Features')
+      .select('id, asset_id')
+      .eq('coord_key', coordKey)
+      .limit(1)
+      .maybeSingle();
+    if (existingAtCoord.error) {
+      console.error('saveFeature coord lookup error:', existingAtCoord.error.message);
+    } else if (existingAtCoord.data?.id && existingAtCoord.data.id !== id) {
+      id = existingAtCoord.data.id;
+      if (existingAtCoord.data.asset_id && !feature.properties?.asset_id) {
+        feature.properties = { ...(feature.properties ?? {}), asset_id: existingAtCoord.data.asset_id };
+      }
+    }
+  }
+
   feature.properties = { ...(feature.properties ?? {}), id };
   drawIdToDbId.set(feature.id, id);
+  const ensuredAssetId = await ensurePointAssetId(feature, id);
 
   const baseRow = {
     id,
@@ -188,11 +351,11 @@ export async function saveFeature(feature) {
     description: feature.properties.description ?? null,
     color:       feature.properties.color       ?? DEFAULT_FEATURE_COLOR,
     image:       feature.properties.image       ?? null,
-    coord_key:   getCoordKey(feature.geometry),
+    coord_key:   coordKey,
   };
 
-  if (hasOwn(feature.properties, 'asset_id')) {
-    baseRow.asset_id = feature.properties.asset_id ?? null;
+  if (feature.geometry?.type === 'Point') {
+    baseRow.asset_id = ensuredAssetId ?? feature.properties.asset_id ?? null;
   }
 
   let payload = {
@@ -285,7 +448,7 @@ export async function openFeatureSidebar(feature, draw, map) {
   let dbId = resolveFeatureDbId(feature);
   if (!dbId) {
     dbId = crypto.randomUUID();
-    draw.setFeatureProperty(drawId, 'id', dbId);
+    safeSetFeatureProperty(draw, drawId, 'id', dbId);
     feature.properties = { ...(feature.properties ?? {}), id: dbId };
   }
   drawIdToDbId.set(drawId, dbId);
@@ -353,8 +516,8 @@ export async function openFeatureSidebar(feature, draw, map) {
     };
 
     // setFeatureProperty uses Draw's internal string ID, not the DB UUID
-    activeDraw.setFeatureProperty(drawId, 'color', color);
-    activeDraw.setFeatureProperty(drawId, 'title', updated.properties.title);
+    safeSetFeatureProperty(activeDraw, drawId, 'color', color);
+    safeSetFeatureProperty(activeDraw, drawId, 'title', updated.properties.title);
     map.triggerRepaint();
 
     const error = await saveFeature(updated);
@@ -535,7 +698,9 @@ async function setupObservationsUI({ feature, dbId, role }) {
   const initialCaseId = feature.properties?.case_id || '';
   const currentUserId = getCurrentUserId();
   assetInput.value = initialAssetId;
-  assetHintEl.textContent = 'Required UUID format: 123e4567-e89b-12d3-a456-426614174000';
+  assetHintEl.textContent = assetsAccessBlocked
+    ? 'Assets table access blocked by RLS. Asset ID is optional for now.'
+    : 'Required UUID format: 123e4567-e89b-12d3-a456-426614174000';
 
   const getLookupScope = (resolvedAssetId = null) => {
     const lookupAssetId = resolvedAssetId ?? assetInput.value.trim();
@@ -615,20 +780,20 @@ async function setupObservationsUI({ feature, dbId, role }) {
     saveBtn.disabled = true;
     saveBtn.textContent = 'Saving...';
     saveBtn.classList.remove('error');
-
-    const rawAssetId = assetInput.value.trim();
-    if (!rawAssetId) {
-      saveBtn.textContent = 'Asset ID required';
+    if (observationsAccessBlocked) {
+      roleHint.textContent = 'Observations insert is blocked by RLS for your account. Ask admin to grant akimat insert policy.';
+      saveBtn.textContent = 'RLS blocked';
       saveBtn.classList.add('error');
       saveBtn.disabled = false;
-      assetHintEl.textContent = 'Provide an asset UUID before saving observations.';
       setTimeout(() => {
         saveBtn.textContent = 'Add observation';
         saveBtn.classList.remove('error');
-      }, 2200);
+      }, 2000);
       return;
     }
-    if (!isUuid(rawAssetId)) {
+
+    const rawAssetId = assetInput.value.trim();
+    if (rawAssetId && !isUuid(rawAssetId)) {
       saveBtn.textContent = 'Invalid Asset ID';
       saveBtn.classList.add('error');
       saveBtn.disabled = false;
@@ -641,7 +806,23 @@ async function setupObservationsUI({ feature, dbId, role }) {
     }
 
     const dbLinkedAssetId = await getDbLinkedAssetId();
-    if (dbLinkedAssetId && dbLinkedAssetId !== rawAssetId) {
+
+    let nextAssetId = rawAssetId || null;
+    if (!nextAssetId && dbLinkedAssetId && isUuid(dbLinkedAssetId)) {
+      nextAssetId = dbLinkedAssetId;
+    }
+    if (!nextAssetId) nextAssetId = crypto.randomUUID();
+
+    assetInput.value = nextAssetId;
+
+    if (nextAssetId && !assetsAccessBlocked) {
+      const assetProvisioned = await ensureAssetRecordExists(nextAssetId);
+      if (!assetProvisioned) {
+        assetHintEl.textContent = 'Could not auto-provision assets row; will still keep and use this feature asset_id.';
+      }
+    }
+
+    if (dbLinkedAssetId && nextAssetId && dbLinkedAssetId !== nextAssetId) {
       saveBtn.textContent = 'Already linked';
       saveBtn.classList.add('error');
       saveBtn.disabled = false;
@@ -668,57 +849,64 @@ async function setupObservationsUI({ feature, dbId, role }) {
       }, 2200);
       return;
     }
-    const existing = await supabase
-      .from('Map Features')
-      .select('id, geometry, asset_id, coord_key')
-      .eq('asset_id', rawAssetId)
-      .neq('id', dbId)
-      .limit(1)
-      .maybeSingle();
-    if (existing.error) {
-      console.error('asset duplicate check error:', existing.error.message);
-    } else if (existing.data) {
-      const existingCoords = existing.data.geometry?.coordinates;
-      const existingCoordKey = existing.data.coord_key
-        || (Array.isArray(existingCoords) ? `${Number(existingCoords[0]).toFixed(6)},${Number(existingCoords[1]).toFixed(6)}` : null);
-      const samePoint = Array.isArray(existingCoords)
-        && Array.isArray(featureCoords)
-        && existingCoords[0] === featureCoords[0]
-        && existingCoords[1] === featureCoords[1];
-      if (!samePoint && existingCoordKey !== featureCoordKey) {
-        saveBtn.textContent = 'Asset already mapped';
-        saveBtn.classList.add('error');
-        saveBtn.disabled = false;
-        assetHintEl.textContent = `Asset "${rawAssetId}" is already linked to another coordinate.`;
-        setTimeout(() => {
-          saveBtn.textContent = 'Add observation';
-          saveBtn.classList.remove('error');
-        }, 2600);
-        return;
+    if (nextAssetId) {
+      const existing = await supabase
+        .from('Map Features')
+        .select('id, geometry, asset_id, coord_key')
+        .eq('asset_id', nextAssetId)
+        .neq('id', dbId)
+        .limit(1)
+        .maybeSingle();
+      if (existing.error) {
+        console.error('asset duplicate check error:', existing.error.message);
+      } else if (existing.data) {
+        const existingCoords = existing.data.geometry?.coordinates;
+        const existingCoordKey = existing.data.coord_key
+          || (Array.isArray(existingCoords) ? `${Number(existingCoords[0]).toFixed(6)},${Number(existingCoords[1]).toFixed(6)}` : null);
+        const samePoint = Array.isArray(existingCoords)
+          && Array.isArray(featureCoords)
+          && existingCoords[0] === featureCoords[0]
+          && existingCoords[1] === featureCoords[1];
+        if (!samePoint && existingCoordKey !== featureCoordKey) {
+          saveBtn.textContent = 'Asset already mapped';
+          saveBtn.classList.add('error');
+          saveBtn.disabled = false;
+          assetHintEl.textContent = `Asset "${nextAssetId}" is already linked to another coordinate.`;
+          setTimeout(() => {
+            saveBtn.textContent = 'Add observation';
+            saveBtn.classList.remove('error');
+          }, 2600);
+          return;
+        }
       }
     }
 
-    if (!dbLinkedAssetId) {
+    if (!dbLinkedAssetId && nextAssetId) {
       const linkUpdate = await supabase
         .from('Map Features')
-        .update({ asset_id: rawAssetId, coord_key: featureCoordKey })
+        .update({ asset_id: nextAssetId, coord_key: featureCoordKey })
         .eq('id', dbId);
       if (linkUpdate.error) {
-        console.error('feature asset link update error:', linkUpdate.error.message);
-        saveBtn.textContent = 'Link failed';
-        saveBtn.classList.add('error');
-        saveBtn.disabled = false;
-        assetHintEl.textContent = `Could not link feature to asset: ${linkUpdate.error.message}`;
-        setTimeout(() => {
-          saveBtn.textContent = 'Add observation';
-          saveBtn.classList.remove('error');
-        }, 2600);
-        return;
+        const linkFkError = linkUpdate.error.code === '23503'
+          || linkUpdate.error.message?.includes('asset_id_fkey');
+        if (linkFkError && assetsAccessBlocked) {
+          assetHintEl.textContent = 'Feature link to assets is blocked by RLS; current feature asset_id remains local.';
+        } else {
+          console.error('feature asset link update error:', linkUpdate.error.message);
+          saveBtn.textContent = 'Link failed';
+          saveBtn.classList.add('error');
+          saveBtn.disabled = false;
+          assetHintEl.textContent = `Could not link feature to asset: ${linkUpdate.error.message}`;
+          setTimeout(() => {
+            saveBtn.textContent = 'Add observation';
+            saveBtn.classList.remove('error');
+          }, 2600);
+          return;
+        }
       }
-      feature.properties.asset_id = rawAssetId;
+      if (nextAssetId) feature.properties.asset_id = nextAssetId;
     }
 
-    const nextAssetId = rawAssetId;
     const nextLocationId = isUuid(initialLocationId) ? initialLocationId : null;
     const nextCaseId = isUuid(initialCaseId) ? initialCaseId : null;
     const payload = getObservationInputValues(role);
@@ -746,16 +934,46 @@ async function setupObservationsUI({ feature, dbId, role }) {
       .insert([insertRow]);
 
     if (error) {
-      console.error('insert observation error:', error.message);
-      roleHint.textContent = `Insert failed: ${error.message}`;
-      saveBtn.textContent = 'Insert failed';
-      saveBtn.classList.add('error');
-      saveBtn.disabled = false;
-      setTimeout(() => {
-        saveBtn.textContent = 'Add observation';
-        saveBtn.classList.remove('error');
-      }, 1800);
-      return;
+      const isRlsError = error.code === '42501'
+        || /row-level security|permission|forbidden|not allowed/i.test(error.message ?? '');
+      if (isRlsError) {
+        observationsAccessBlocked = true;
+      }
+      const isAssetFkViolation = error.code === '23503'
+        || error.message?.includes('observations_asset_id_fkey');
+      if (isAssetFkViolation && nextAssetId) {
+        const retry = await supabase
+          .from('observations')
+          .insert([{
+            ...insertRow,
+            asset_id: null,
+          }]);
+        if (!retry.error) {
+          assetHintEl.textContent = 'Observation saved without asset_id due FK/RLS restrictions.';
+        } else {
+          console.error('insert observation retry error:', retry.error.message);
+          roleHint.textContent = `Insert failed: ${retry.error.message}`;
+          saveBtn.textContent = 'Insert failed';
+          saveBtn.classList.add('error');
+          saveBtn.disabled = false;
+          setTimeout(() => {
+            saveBtn.textContent = 'Add observation';
+            saveBtn.classList.remove('error');
+          }, 1800);
+          return;
+        }
+      } else {
+        console.error('insert observation error:', error.message);
+        roleHint.textContent = `Insert failed: ${error.message}`;
+        saveBtn.textContent = 'Insert failed';
+        saveBtn.classList.add('error');
+        saveBtn.disabled = false;
+        setTimeout(() => {
+          saveBtn.textContent = 'Add observation';
+          saveBtn.classList.remove('error');
+        }, 1800);
+        return;
+      }
     }
 
     const refreshed = await loadObservations(getLookupScope(nextAssetId));
@@ -786,7 +1004,7 @@ export async function setupDraw(map) {
   // Live color preview
   document.getElementById('feature-color').addEventListener('input', e => {
     if (!activeFeature) return;
-    draw.setFeatureProperty(activeFeature.id, 'color', e.target.value);
+    safeSetFeatureProperty(draw, activeFeature.id, 'color', e.target.value);
     map.triggerRepaint();
   });
 
@@ -797,6 +1015,7 @@ export async function setupDraw(map) {
     draw.add(saved);
     for (const feat of saved.features) {
       drawIdToDbId.set(feat.id, feat.properties?.id ?? feat.id);
+      safeSetFeatureProperty(draw, feat.id, 'color', feat.properties?.color ?? DEFAULT_FEATURE_COLOR);
       if (feat.geometry.type === 'Point' && feat.properties.icon) {
         updateIconMarker(map, feat.id, feat.geometry.coordinates,
           feat.properties.icon, feat.properties.icon_url);
@@ -828,8 +1047,14 @@ export async function setupDraw(map) {
     const feature = e.features[0];
     const dbId = crypto.randomUUID();
     feature.properties.id = dbId;
-    draw.setFeatureProperty(feature.id, 'id', dbId);
+    if (!feature.properties.color) feature.properties.color = DEFAULT_FEATURE_COLOR;
+    safeSetFeatureProperty(draw, feature.id, 'id', dbId);
+    safeSetFeatureProperty(draw, feature.id, 'color', feature.properties.color);
     drawIdToDbId.set(feature.id, dbId);
+    await ensurePointAssetId(feature, dbId);
+    if (feature.properties.asset_id) {
+      safeSetFeatureProperty(draw, feature.id, 'asset_id', feature.properties.asset_id);
+    }
     await saveFeature(feature);
     openFeatureSidebar(feature, draw, map);
   });
@@ -838,8 +1063,13 @@ export async function setupDraw(map) {
     for (const feature of e.features) {
       const dbId = resolveFeatureDbId(feature);
       if (dbId && feature.properties?.id !== dbId) {
-        draw.setFeatureProperty(feature.id, 'id', dbId);
+        safeSetFeatureProperty(draw, feature.id, 'id', dbId);
       }
+      await ensurePointAssetId(feature, dbId);
+      if (feature.properties?.asset_id) {
+        safeSetFeatureProperty(draw, feature.id, 'asset_id', feature.properties.asset_id);
+      }
+      safeSetFeatureProperty(draw, feature.id, 'color', feature.properties?.color ?? DEFAULT_FEATURE_COLOR);
       await saveFeature(feature);
       if (feature.geometry.type === 'Point') {
         updateIconMarker(map, feature.id, feature.geometry.coordinates,

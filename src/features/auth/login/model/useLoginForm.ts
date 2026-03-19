@@ -52,7 +52,14 @@ function useLoginForm() {
       return authResult
     }
 
-    navigate(getDefaultRouteForRole(authResult.data?.profile?.role ?? null), {
+    const nextRole = authResult.data?.profile?.role ?? null
+
+    if (!nextRole) {
+      setSubmitError('Your account role is not configured. Contact an administrator.')
+      return authResult
+    }
+
+    navigate(getDefaultRouteForRole(nextRole), {
       replace: true,
     })
 

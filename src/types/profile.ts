@@ -28,6 +28,8 @@ export type Profile = {
   avatarUrl: string
   companyName: string
   licenseNumber: string
+  createdAt: string | null
+  updatedAt: string | null
 }
 
 export type ProfileCreateInput = {
@@ -42,4 +44,4 @@ export type ProfileCreateInput = {
   licenseNumber?: string | null
 }
 
-export type ProfileUpdateInput = Partial<ProfileCreateInput>
+export type ProfileUpdateInput = Partial<Omit<ProfileCreateInput, 'email'>>
