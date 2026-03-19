@@ -1,86 +1,174 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { ArrowRight, Eye, EyeOff, Lock, Mail, User, Users } from 'lucide-react'
+import { AuthLayout } from '@/components/auth/auth-layout'
+import { Button } from '@/components/ui/button'
+import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
 import useRegisterForm from '../model/useRegisterForm'
-import styles from './RegisterForm.module.css'
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+} from '@/components/ui/input-group'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 
 function RegisterForm() {
   const { formData, handleSubmit, handleFieldChange } = useRegisterForm()
+  const [showPassword, setShowPassword] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+
+  const onSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    setIsLoading(true)
+    try {
+      await handleSubmit(event)
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   return (
-    <main className={styles.page}>
-      <section className={styles.card}>
-        <div className={styles.header}>
-          <p className={styles.eyebrow}>Registration</p>
-          <h1 className={styles.title}>Create your account</h1>
-          <p className={styles.subtitle}>
-            Register with your full name, email, and password to access the
-            platform.
-          </p>
-        </div>
+    <AuthLayout
+      title="Create Account"
+      subtitle="Join the Alatau Smart City community"
+    >
+      <form onSubmit={onSubmit} className="space-y-6">
+        <FieldGroup>
+          <Field>
+            <FieldLabel htmlFor="fullName">Full name</FieldLabel>
+            <InputGroup>
+              <InputGroupAddon>
+                <User className="h-4 w-4 text-muted-foreground" />
+              </InputGroupAddon>
+              <InputGroupInput
+                id="fullName"
+                type="text"
+                name="fullName"
+                placeholder="Enter your full name"
+                value={formData.fullName}
+                onChange={handleFieldChange}
+                required
+                autoComplete="name"
+              />
+            </InputGroup>
+          </Field>
 
-        <form className={styles.form} onSubmit={handleSubmit}>
-          <label className={styles.field}>
-            <span className={styles.label}>Full name</span>
-            <input
-              className={styles.input}
-              type="text"
-              name="fullName"
-              value={formData.fullName}
-              onChange={handleFieldChange}
-              placeholder="Enter full name"
-            />
-          </label>
+          <Field>
+            <FieldLabel htmlFor="email">Email</FieldLabel>
+            <InputGroup>
+              <InputGroupAddon>
+                <Mail className="h-4 w-4 text-muted-foreground" />
+              </InputGroupAddon>
+              <InputGroupInput
+                id="email"
+                type="email"
+                name="email"
+                placeholder="Enter your email"
+                value={formData.email}
+                onChange={handleFieldChange}
+                required
+                autoComplete="email"
+              />
+            </InputGroup>
+          </Field>
 
-          <label className={styles.field}>
-            <span className={styles.label}>Email</span>
-            <input
-              className={styles.input}
-              type="email"
-              name="email"
-              value={formData.email}
-              onChange={handleFieldChange}
-              placeholder="Enter email"
-            />
-          </label>
+          <Field>
+            <FieldLabel htmlFor="password">Password</FieldLabel>
+            <InputGroup>
+              <InputGroupAddon>
+                <Lock className="h-4 w-4 text-muted-foreground" />
+              </InputGroupAddon>
+              <InputGroupInput
+                id="password"
+                type={showPassword ? 'text' : 'password'}
+                name="password"
+                placeholder="Create a password"
+                value={formData.password}
+                onChange={handleFieldChange}
+                required
+                autoComplete="new-password"
+              />
+              <InputGroupAddon>
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((current) => !current)}
+                  className="text-muted-foreground hover:text-foreground transition-colors"
+                  tabIndex={-1}
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                </button>
+              </InputGroupAddon>
+            </InputGroup>
+          </Field>
 
-          <label className={styles.field}>
-            <span className={styles.label}>Password</span>
-            <input
-              className={styles.input}
-              type="password"
-              name="password"
-              value={formData.password}
-              onChange={handleFieldChange}
-              placeholder="Enter password"
-            />
-          </label>
+          <Field>
+            <FieldLabel htmlFor="role">Select role</FieldLabel>
+            <div className="relative">
+              <div className="absolute left-3 top-1/2 -translate-y-1/2 z-10 pointer-events-none">
+                <Users className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <Select
+                value={formData.role}
+                onValueChange={(value) =>
+                  handleFieldChange({
+                    target: { name: 'role', value },
+                  } as React.ChangeEvent<HTMLSelectElement>)
+                }
+              >
+                <SelectTrigger
+                  id="role"
+                  className="w-full pl-10 h-10 bg-input border-border"
+                >
+                  <SelectValue placeholder="Select your role" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="user">User</SelectItem>
+                  <SelectItem value="developer">Developer</SelectItem>
+                  <SelectItem value="industrialist">Industrialist</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </Field>
+        </FieldGroup>
 
-          <label className={styles.field}>
-            <span className={styles.label}>Role</span>
-            <select
-              className={styles.select}
-              name="role"
-              value={formData.role}
-              onChange={handleFieldChange}
-            >
-              <option value="user">user</option>
-              <option value="developer">developer</option>
-              <option value="industrialist">industrialist</option>
-            </select>
-          </label>
+        <Button
+          type="submit"
+          className="w-full h-11 bg-primary text-primary-foreground hover:bg-primary/90"
+          disabled={isLoading}
+        >
+          {isLoading ? (
+            <span className="flex items-center gap-2">
+              <span className="h-4 w-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
+              Creating account...
+            </span>
+          ) : (
+            <span className="flex items-center gap-2">
+              Create Account
+              <ArrowRight className="h-4 w-4" />
+            </span>
+          )}
+        </Button>
 
-          <button className={styles.submitButton} type="submit">
-            Register
-          </button>
-        </form>
-
-        <p className={styles.loginPrompt}>
-          Already registered?{' '}
-          <Link className={styles.loginLink} to="/login">
-            Log in
+        <p className="text-center text-sm text-muted-foreground">
+          Already have an account?{' '}
+          <Link
+            to="/login"
+            className="text-accent hover:underline underline-offset-4 transition-colors"
+          >
+            Sign in
           </Link>
         </p>
-      </section>
-    </main>
+      </form>
+    </AuthLayout>
   )
 }
 

@@ -47,3 +47,4 @@ export const signIn = async ({ email, password }: SignInPayload) => {
 
   return data
 }
+

@@ -1,59 +1,119 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { ArrowRight, Eye, EyeOff, Lock, User } from 'lucide-react'
+import { AuthLayout } from '@/components/auth/auth-layout'
+import { Button } from '@/components/ui/button'
+import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+} from '@/components/ui/input-group'
 import useLoginForm from '../model/useLoginForm'
-import styles from './LoginForm.module.css'
 
 function LoginForm() {
   const { formData, handleSubmit, handleFieldChange } = useLoginForm()
+  const [showPassword, setShowPassword] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+
+  const onSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    setIsLoading(true)
+    try {
+      await handleSubmit(event)
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   return (
-    <main className={styles.page}>
-      <section className={styles.card}>
-        <div className={styles.header}>
-          <p className={styles.eyebrow}>Login</p>
-          <h1 className={styles.title}>Welcome back</h1>
-          <p className={styles.subtitle}>
-            Sign in with your email and password to continue.
-          </p>
-        </div>
+    <AuthLayout
+      title="Sign In"
+      subtitle="Enter your credentials to access your account"
+    >
+      <form onSubmit={onSubmit} className="space-y-6">
+        <FieldGroup>
+          <Field>
+            <FieldLabel htmlFor="email">Email</FieldLabel>
+            <InputGroup>
+              <InputGroupAddon>
+                <User className="h-4 w-4 text-muted-foreground" />
+              </InputGroupAddon>
+              <InputGroupInput
+                id="email"
+                type="email"
+                name="email"
+                placeholder="Enter your email"
+                value={formData.email}
+                onChange={handleFieldChange}
+                required
+                autoComplete="email"
+              />
+            </InputGroup>
+          </Field>
 
-        <form className={styles.form} onSubmit={handleSubmit}>
-          <label className={styles.field}>
-            <span className={styles.label}>Email</span>
-            <input
-              className={styles.input}
-              type="email"
-              name="email"
-              value={formData.email}
-              onChange={handleFieldChange}
-              placeholder="Enter email"
-            />
-          </label>
+          <Field>
+            <FieldLabel htmlFor="password">Password</FieldLabel>
+            <InputGroup>
+              <InputGroupAddon>
+                <Lock className="h-4 w-4 text-muted-foreground" />
+              </InputGroupAddon>
+              <InputGroupInput
+                id="password"
+                type={showPassword ? 'text' : 'password'}
+                name="password"
+                placeholder="Enter your password"
+                value={formData.password}
+                onChange={handleFieldChange}
+                required
+                autoComplete="current-password"
+              />
+              <InputGroupAddon>
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((current) => !current)}
+                  className="text-muted-foreground hover:text-foreground transition-colors"
+                  tabIndex={-1}
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                </button>
+              </InputGroupAddon>
+            </InputGroup>
+          </Field>
+        </FieldGroup>
 
-          <label className={styles.field}>
-            <span className={styles.label}>Password</span>
-            <input
-              className={styles.input}
-              type="password"
-              name="password"
-              value={formData.password}
-              onChange={handleFieldChange}
-              placeholder="Enter password"
-            />
-          </label>
+        <Button
+          type="submit"
+          className="w-full h-11 bg-primary text-primary-foreground hover:bg-primary/90"
+          disabled={isLoading}
+        >
+          {isLoading ? (
+            <span className="flex items-center gap-2">
+              <span className="h-4 w-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
+              Signing in...
+            </span>
+          ) : (
+            <span className="flex items-center gap-2">
+              Sign In
+              <ArrowRight className="h-4 w-4" />
+            </span>
+          )}
+        </Button>
 
-          <button className={styles.submitButton} type="submit">
-            Log in
-          </button>
-        </form>
-
-        <p className={styles.registerPrompt}>
-          Need an account?{' '}
-          <Link className={styles.registerLink} to="/register">
+        <p className="text-center text-sm text-muted-foreground">
+          {"Don't have an account? "}
+          <Link
+            to="/register"
+            className="text-accent hover:underline underline-offset-4 transition-colors"
+          >
             Register
           </Link>
         </p>
-      </section>
-    </main>
+      </form>
+    </AuthLayout>
   )
 }
 
