@@ -1,21 +1,26 @@
 import { useState, type ChangeEvent, type FormEvent } from 'react'
+import { signIn } from '../../../../services/api/authService'
 
 export type LoginFormData = {
-  username: string
+  email: string
   password: string
 }
 
 const initialFormData: LoginFormData = {
-  username: '',
+  email: '',
   password: '',
 }
 
 function useLoginForm() {
   const [formData, setFormData] = useState<LoginFormData>(initialFormData)
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    console.log(formData)
+
+    await signIn({
+      email: formData.email,
+      password: formData.password,
+    })
   }
 
   const handleFieldChange = (event: ChangeEvent<HTMLInputElement>) => {

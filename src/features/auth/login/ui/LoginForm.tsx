@@ -12,20 +12,20 @@ function LoginForm() {
           <p className={styles.eyebrow}>Login</p>
           <h1 className={styles.title}>Welcome back</h1>
           <p className={styles.subtitle}>
-            Sign in with your username and password to continue.
+            Sign in with your email and password to continue.
           </p>
         </div>
 
         <form className={styles.form} onSubmit={handleSubmit}>
           <label className={styles.field}>
-            <span className={styles.label}>Username</span>
+            <span className={styles.label}>Email</span>
             <input
               className={styles.input}
-              type="text"
-              name="username"
-              value={formData.username}
+              type="email"
+              name="email"
+              value={formData.email}
               onChange={handleFieldChange}
-              placeholder="Enter username"
+              placeholder="Enter email"
             />
           </label>
 

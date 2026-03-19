@@ -1,15 +1,18 @@
 import { useState, type ChangeEvent, type FormEvent } from 'react'
+import { signUp } from '../../../../services/api/authService'
 
 export type RegisterRole = 'user' | 'developer' | 'industrialist'
 
 export type RegisterFormData = {
-  username: string
+  fullName: string
+  email: string
   password: string
   role: RegisterRole
 }
 
 const initialFormData: RegisterFormData = {
-  username: '',
+  fullName: '',
+  email: '',
   password: '',
   role: 'user',
 }
@@ -17,9 +20,14 @@ const initialFormData: RegisterFormData = {
 function useRegisterForm() {
   const [formData, setFormData] = useState<RegisterFormData>(initialFormData)
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    console.log(formData)
+
+    await signUp({
+      email: formData.email,
+      password: formData.password,
+      fullName: formData.fullName,
+    })
   }
 
   const handleFieldChange = (

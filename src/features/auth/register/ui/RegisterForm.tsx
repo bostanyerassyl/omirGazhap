@@ -12,21 +12,33 @@ function RegisterForm() {
           <p className={styles.eyebrow}>Registration</p>
           <h1 className={styles.title}>Create your account</h1>
           <p className={styles.subtitle}>
-            Register as a user, developer, or industrialist to access the
+            Register with your full name, email, and password to access the
             platform.
           </p>
         </div>
 
         <form className={styles.form} onSubmit={handleSubmit}>
           <label className={styles.field}>
-            <span className={styles.label}>Username</span>
+            <span className={styles.label}>Full name</span>
             <input
               className={styles.input}
               type="text"
-              name="username"
-              value={formData.username}
+              name="fullName"
+              value={formData.fullName}
               onChange={handleFieldChange}
-              placeholder="Enter username"
+              placeholder="Enter full name"
+            />
+          </label>
+
+          <label className={styles.field}>
+            <span className={styles.label}>Email</span>
+            <input
+              className={styles.input}
+              type="email"
+              name="email"
+              value={formData.email}
+              onChange={handleFieldChange}
+              placeholder="Enter email"
             />
           </label>
 
