@@ -1,16 +1,10 @@
-import type {
-  AuthChangeEvent,
-  Session,
-  Subscription,
-  User,
-} from '@supabase/supabase-js'
+import type { AuthChangeEvent, Session, Subscription, User } from '@supabase/supabase-js'
 import type { AuthResult, AuthSessionData, Role } from '@/types/auth'
 import { logger } from '@/services/logger'
 import { toError } from '@/utils/error'
 import { supabase } from '../supabaseClient'
 
 const AUTH_SNAPSHOT_KEY = 'auth.snapshot'
-const USER_ROLE_MAP_KEY = 'auth.role-map'
 
 export type SignUpPayload = {
   email: string
@@ -26,43 +20,6 @@ export type SignInPayload = {
 
 function canUseStorage() {
   return typeof window !== 'undefined'
-}
-
-function readRoleMap(): Record<string, Role> {
-  if (!canUseStorage()) {
-    return {}
-  }
-
-  const storedValue = window.localStorage.getItem(USER_ROLE_MAP_KEY)
-
-  if (!storedValue) {
-    return {}
-  }
-
-  try {
-    return JSON.parse(storedValue) as Record<string, Role>
-  } catch {
-    return {}
-  }
-}
-
-function writeRoleMap(roleMap: Record<string, Role>) {
-  if (!canUseStorage()) {
-    return
-  }
-
-  window.localStorage.setItem(USER_ROLE_MAP_KEY, JSON.stringify(roleMap))
-}
-
-function persistRole(user: User, role: Role) {
-  const roleMap = readRoleMap()
-  roleMap[user.id] = role
-
-  if (user.email) {
-    roleMap[user.email.toLowerCase()] = role
-  }
-
-  writeRoleMap(roleMap)
 }
 
 function persistSnapshot(user: User | null, role: Role | null) {
@@ -84,71 +41,10 @@ function persistSnapshot(user: User | null, role: Role | null) {
   )
 }
 
-function getFallbackSnapshotRole(user: User | null): Role | null {
-  if (!canUseStorage() || !user) {
-    return null
-  }
-
-  const storedValue = window.localStorage.getItem(AUTH_SNAPSHOT_KEY)
-
-  if (!storedValue) {
-    return null
-  }
-
-  try {
-    const snapshot = JSON.parse(storedValue) as { userId?: string; role?: Role }
-
-    return snapshot.userId === user.id ? snapshot.role ?? null : null
-  } catch {
-    return null
-  }
-}
-
-function resolveRole(user: User | null, fallbackRole?: Role | null): Role | null {
-  if (!user) {
-    return fallbackRole ?? null
-  }
-
-  const metadataRole =
-    typeof user.user_metadata.role === 'string' ? user.user_metadata.role : null
-
-  if (
-    metadataRole === 'user' ||
-    metadataRole === 'developer' ||
-    metadataRole === 'industrialist' ||
-    metadataRole === 'utilities' ||
-    metadataRole === 'akimat' ||
-    metadataRole === 'admin'
-  ) {
-    return metadataRole
-  }
-
-  const roleMap = readRoleMap()
-
-  if (roleMap[user.id]) {
-    return roleMap[user.id]
-  }
-
-  if (user.email && roleMap[user.email.toLowerCase()]) {
-    return roleMap[user.email.toLowerCase()]
-  }
-
-  return fallbackRole ?? null
-}
-
-function toSessionData(session: Session | null, fallbackRole?: Role | null): AuthSessionData {
-  const user = session?.user ?? null
-  const role = resolveRole(user, fallbackRole ?? getFallbackSnapshotRole(user))
-
-  if (user && role) {
-    persistRole(user, role)
-    persistSnapshot(user, role)
-  }
-
+function toSessionData(session: Session | null): AuthSessionData {
   return {
     session,
-    user,
-    role,
+    user: session?.user ?? null,
   }
 }
 
@@ -175,6 +71,7 @@ export async function signUp({
       options: {
         data: {
           full_name: fullName,
+          role,
         },
       },
     })
@@ -186,12 +83,8 @@ export async function signUp({
       }
     }
 
-    if (data.user) {
-      persistRole(data.user, role)
-    }
-
     return {
-      data: toSessionData(data.session, role),
+      data: toSessionData(data.session),
       error: null,
     }
   } catch (error) {
@@ -277,5 +170,9 @@ export function subscribeToAuthChanges(
   })
 
   return subscription
+}
+
+export function persistAuthSnapshot(user: User | null, role: Role | null) {
+  persistSnapshot(user, role)
 }
 

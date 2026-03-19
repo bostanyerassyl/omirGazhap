@@ -59,8 +59,8 @@ function useRegisterForm() {
       return authResult
     }
 
-    if (authResult.data?.session && authResult.data.role) {
-      navigate(getDefaultRouteForRole(authResult.data.role), {
+    if (authResult.data?.session && authResult.data.profile?.role) {
+      navigate(getDefaultRouteForRole(authResult.data.profile.role), {
         replace: true,
       })
       return authResult

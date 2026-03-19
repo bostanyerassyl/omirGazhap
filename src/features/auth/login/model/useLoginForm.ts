@@ -52,7 +52,7 @@ function useLoginForm() {
       return authResult
     }
 
-    navigate(getDefaultRouteForRole(authResult.data?.role ?? null), {
+    navigate(getDefaultRouteForRole(authResult.data?.profile?.role ?? null), {
       replace: true,
     })
 

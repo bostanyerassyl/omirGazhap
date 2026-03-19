@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { 
   User, 
   Camera, 
@@ -27,7 +27,7 @@ import {
 export function DeveloperProfile() {
   const [isEditing, setIsEditing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
-  const { logout } = useAuth()
+  const { logout, profile: authProfile, updateProfile } = useAuth()
   const [profile, setProfile] = useState({
     name: "Alatau Development Corp",
     email: "contact@alataudev.kz",
@@ -38,9 +38,33 @@ export function DeveloperProfile() {
     bio: "Leading construction and development company specializing in smart city infrastructure and sustainable building solutions.",
   })
 
+  useEffect(() => {
+    if (!authProfile) {
+      return
+    }
+
+    setProfile({
+      name: authProfile.fullName,
+      email: authProfile.email,
+      phone: authProfile.phone,
+      companyName: authProfile.companyName || authProfile.fullName,
+      address: authProfile.address,
+      licenseNumber: authProfile.licenseNumber,
+      bio: authProfile.bio,
+    })
+  }, [authProfile])
+
   const handleSave = async () => {
     setIsSaving(true)
-    await new Promise(resolve => setTimeout(resolve, 1000))
+    await updateProfile({
+      fullName: profile.name,
+      email: profile.email,
+      phone: profile.phone,
+      address: profile.address,
+      bio: profile.bio,
+      companyName: profile.companyName,
+      licenseNumber: profile.licenseNumber,
+    })
     setIsSaving(false)
     setIsEditing(false)
   }

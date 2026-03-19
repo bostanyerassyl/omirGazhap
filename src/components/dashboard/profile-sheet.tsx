@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Camera, Mail, Phone, MapPin, Save, User } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
@@ -13,6 +13,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet"
+import { useAuth } from "@/features/auth/model/AuthProvider"
 
 interface UserProfile {
   name: string
@@ -24,6 +25,7 @@ interface UserProfile {
 }
 
 export function ProfileSheet() {
+  const { profile: authProfile, updateProfile } = useAuth()
   const [profile, setProfile] = useState<UserProfile>({
     name: "Citizen User",
     email: "user@alatau.city",
@@ -33,6 +35,22 @@ export function ProfileSheet() {
     avatar: ""
   })
   const [isEditing, setIsEditing] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+
+  useEffect(() => {
+    if (!authProfile) {
+      return
+    }
+
+    setProfile({
+      name: authProfile.fullName,
+      email: authProfile.email,
+      phone: authProfile.phone,
+      address: authProfile.address,
+      bio: authProfile.bio,
+      avatar: authProfile.avatarUrl,
+    })
+  }, [authProfile])
 
   const handleAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -45,7 +63,17 @@ export function ProfileSheet() {
     }
   }
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    setIsSaving(true)
+    await updateProfile({
+      fullName: profile.name,
+      email: profile.email,
+      phone: profile.phone,
+      address: profile.address,
+      bio: profile.bio,
+      avatarUrl: profile.avatar,
+    })
+    setIsSaving(false)
     setIsEditing(false)
   }
 
@@ -187,9 +215,10 @@ export function ProfileSheet() {
                 <Button 
                   className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90"
                   onClick={handleSave}
+                  disabled={isSaving}
                 >
                   <Save className="size-4 mr-2" />
-                  Save
+                  {isSaving ? 'Saving...' : 'Save'}
                 </Button>
               </>
             ) : (

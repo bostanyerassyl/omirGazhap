@@ -1,5 +1,5 @@
-import type { User } from '@supabase/supabase-js'
 import type { Role } from '@/types/auth'
+import type { Profile } from '@/types/profile'
 
 export type UserProfileData = {
   name: string
@@ -41,17 +41,17 @@ const defaultProfiles: Record<Role, Omit<UserProfileData, 'email'>> = {
   },
 }
 
-export function getUserProfileData(user: User | null, role: Role | null): UserProfileData | null {
-  if (!role) {
+export function getUserProfileData(
+  profile: Profile | null,
+  role: Role | null,
+): UserProfileData | null {
+  if (!role || !profile) {
     return null
   }
 
   const defaults = defaultProfiles[role]
-  const fullName =
-    typeof user?.user_metadata.full_name === 'string' && user.user_metadata.full_name.trim()
-      ? user.user_metadata.full_name
-      : defaults.name
-  const email = user?.email ?? ''
+  const fullName = profile.fullName || defaults.name
+  const email = profile.email
   const initials = fullName
     .split(' ')
     .map((part) => part[0])
