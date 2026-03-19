@@ -21,12 +21,64 @@ import { ProductionSection } from "@/components/industrialist/production-section
 import { FinancesSection } from "@/components/industrialist/finances-section"
 import { useAuth } from "@/features/auth/model/AuthProvider"
 import { useDashboardData } from "@/features/dashboard/model/useDashboardData"
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet"
 
 export default function IndustrialistDashboard() {
   const [activeTab, setActiveTab] = useState("emissions")
+  const [notificationsOpen, setNotificationsOpen] = useState(false)
   const { logout } = useAuth()
-  const { data, error, reloadData } = useDashboardData("industrialist")
-  const companyInfo = data?.companyInfo ?? {
+  const {
+    data,
+    error,
+    reloadData,
+    reportIndustrialIncident,
+    sendIndustrialSummaryReport,
+  } = useDashboardData("industrialist")
+  const industrialistData = data ?? {
+    companyInfo: {
+      name: "Industrial Account",
+      avatar: "",
+      notifications: 0,
+    },
+    notifications: [],
+    emissions: {
+      stats: [],
+      monthly: [],
+      breakdown: [],
+      incidents: [],
+    },
+    production: {
+      stats: [],
+      monthly: [],
+      productLines: [],
+      weekly: [],
+      workforce: {
+        totalWorkers: 0,
+        productionLines: 0,
+        activeShifts: 0,
+        capacityUsed: 0,
+      },
+    },
+    finances: {
+      stats: [],
+      monthly: [],
+      expenseBreakdown: [],
+      quarterly: [],
+      transactions: [],
+      summary: {
+        totalRevenue: 0,
+        totalExpenses: 0,
+        totalProfit: 0,
+        taxesPaid: 0,
+      },
+    },
+  }
+  const companyInfo = industrialistData.companyInfo ?? {
     name: "Industrial Account",
     avatar: "",
     notifications: 0,
@@ -95,11 +147,16 @@ export default function IndustrialistDashboard() {
 
             {/* Right - Actions */}
             <div className="flex items-center gap-2">
-              <Button variant="ghost" size="icon" className="relative">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="relative"
+                onClick={() => setNotificationsOpen(true)}
+              >
                 <Bell className="w-5 h-5" />
                 {companyInfo.notifications > 0 && (
                   <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 bg-accent text-accent-foreground text-xs">
-                    {companyInfo.notifications}
+                    {companyInfo.notifications > 99 ? "99+" : companyInfo.notifications}
                   </Badge>
                 )}
               </Button>
@@ -127,10 +184,75 @@ export default function IndustrialistDashboard() {
         <IndustrialistNav activeTab={activeTab} onTabChange={setActiveTab} />
 
         {/* Content based on active tab */}
-        {activeTab === "emissions" && <EmissionsSection />}
-        {activeTab === "production" && <ProductionSection />}
-        {activeTab === "finances" && <FinancesSection />}
+        {activeTab === "emissions" && (
+          <EmissionsSection
+            data={industrialistData.emissions}
+            assetOptions={industrialistData.production.productLines.map((line) => ({
+              id: line.id,
+              name: line.name,
+            }))}
+            onReportIncident={async (payload) => {
+              const result = await reportIndustrialIncident(payload)
+              if (result.error) {
+                throw result.error
+              }
+            }}
+          />
+        )}
+        {activeTab === "production" && (
+          <ProductionSection
+            data={industrialistData.production}
+            onSendReport={async () => {
+              const result = await sendIndustrialSummaryReport({
+                category: "production",
+                title: "Industrial production summary",
+                description: `Production report for ${companyInfo.name}.`,
+              })
+              if (result.error) {
+                throw result.error
+              }
+            }}
+          />
+        )}
+        {activeTab === "finances" && (
+          <FinancesSection
+            data={industrialistData.finances}
+            onSendReport={async () => {
+              const result = await sendIndustrialSummaryReport({
+                category: "finance",
+                title: "Industrial financial summary",
+                description: `Financial report for ${companyInfo.name}.`,
+              })
+              if (result.error) {
+                throw result.error
+              }
+            }}
+          />
+        )}
       </main>
+
+      <Sheet open={notificationsOpen} onOpenChange={setNotificationsOpen}>
+        <SheetContent className="w-full sm:max-w-md bg-background border-border">
+          <SheetHeader>
+            <SheetTitle>Industrial Notifications</SheetTitle>
+          </SheetHeader>
+          <div className="mt-6 max-h-[calc(100vh-120px)] space-y-3 overflow-y-auto pr-1">
+            {industrialistData.notifications.length ? (
+              industrialistData.notifications.map((item) => (
+                <div key={item.id} className="rounded-lg border border-border p-4">
+                  <p className="font-medium text-foreground">{item.title}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">{item.description}</p>
+                  <p className="mt-2 text-xs text-muted-foreground">{item.date}</p>
+                </div>
+              ))
+            ) : (
+              <div className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+                No industrial notifications right now.
+              </div>
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   )
 }

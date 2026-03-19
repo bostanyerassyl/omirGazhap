@@ -12,6 +12,7 @@ import { adminService } from '@/services/domain/adminService'
 import { assetService } from '@/services/domain/assetService'
 import { caseService } from '@/services/domain/caseService'
 import { eventService } from '@/services/domain/eventService'
+import { observationService } from '@/services/domain/observationService'
 import { getDashboardData } from '@/services/data/dashboardDataService'
 import { logger } from '@/services/logger'
 import type { AuthResult } from '@/types/auth'
@@ -32,6 +33,27 @@ type AppDataContextValue = {
   createDeveloperObject: (object: ConstructionObject) => Promise<AuthResult<ConstructionObject>>
   reportDeveloperObject: (payload: {
     objectId: string
+    title: string
+    description: string
+    priority: 'low' | 'medium' | 'high'
+  }) => Promise<AuthResult<null>>
+  reportIndustrialIncident: (payload: {
+    assetId: string
+    type: 'leak' | 'excess' | 'violation' | 'accident'
+    title: string
+    severity: 'low' | 'medium' | 'high' | 'critical'
+    consequence: string
+    solution: string
+  }) => Promise<AuthResult<null>>
+  sendIndustrialSummaryReport: (payload: {
+    category: 'production' | 'finance'
+    title: string
+    description: string
+    assetId?: string | null
+  }) => Promise<AuthResult<null>>
+  reportUtilitiesIssue: (payload: {
+    assetId: string
+    resource: 'electricity' | 'water' | 'gas' | 'transport'
     title: string
     description: string
     priority: 'low' | 'medium' | 'high'
@@ -199,6 +221,213 @@ export function AppDataProvider({ children }: PropsWithChildren) {
           return {
             data: null,
             error: caseResult.error,
+          }
+        }
+
+        await loadData()
+
+        return {
+          data: null,
+          error: null,
+        }
+      },
+      async reportIndustrialIncident({
+        assetId,
+        type,
+        title,
+        severity,
+        consequence,
+        solution,
+      }) {
+        if (!user) {
+          return {
+            data: null,
+            error: new Error('User is not authenticated'),
+          }
+        }
+
+        const severityScore =
+          severity === 'critical' ? 4 : severity === 'high' ? 3 : severity === 'medium' ? 2 : 1
+
+        const eventResult = await eventService.create({
+          assetId,
+          createdBy: user.id,
+          title,
+          description: consequence,
+          eventType: `industrial_${type}`,
+          severity: severityScore,
+          startsAt: new Date().toISOString(),
+          isPublic: true,
+        })
+
+        if (eventResult.error || !eventResult.data) {
+          return {
+            data: null,
+            error: eventResult.error ?? new Error('Unable to create incident event'),
+          }
+        }
+
+        const caseResult = await caseService.create({
+          eventId: eventResult.data.id,
+          createdBy: user.id,
+          assignedRole: 'akimat',
+          status: 'open',
+          priority: severity === 'critical' ? 'urgent' : severity === 'high' ? 'high' : 'medium',
+          visibility: 'public',
+        })
+
+        if (caseResult.error || !caseResult.data) {
+          return {
+            data: null,
+            error: caseResult.error ?? new Error('Unable to create incident case'),
+          }
+        }
+
+        const observationResult = await observationService.create({
+          assetId,
+          caseId: caseResult.data.id,
+          createdBy: user.id,
+          payload: {
+            category: 'industrial',
+            incident_type: type,
+            title,
+            severity,
+            consequence,
+            solution,
+          },
+          reviewStatus: 'pending',
+        })
+
+        if (observationResult.error) {
+          return {
+            data: null,
+            error: observationResult.error,
+          }
+        }
+
+        await loadData()
+
+        return {
+          data: null,
+          error: null,
+        }
+      },
+      async sendIndustrialSummaryReport({ category, title, description, assetId }) {
+        if (!user) {
+          return {
+            data: null,
+            error: new Error('User is not authenticated'),
+          }
+        }
+
+        const eventResult = await eventService.create({
+          assetId: assetId ?? null,
+          createdBy: user.id,
+          title,
+          description,
+          eventType: category === 'production' ? 'industrial_production' : 'industrial_finance',
+          severity: 2,
+          startsAt: new Date().toISOString(),
+          isPublic: true,
+        })
+
+        if (eventResult.error || !eventResult.data) {
+          return {
+            data: null,
+            error: eventResult.error ?? new Error('Unable to create summary event'),
+          }
+        }
+
+        const caseResult = await caseService.create({
+          eventId: eventResult.data.id,
+          createdBy: user.id,
+          assignedRole: 'akimat',
+          status: 'open',
+          priority: 'medium',
+          visibility: 'public',
+        })
+
+        if (caseResult.error) {
+          return {
+            data: null,
+            error: caseResult.error,
+          }
+        }
+
+        await loadData()
+
+        return {
+          data: null,
+          error: null,
+        }
+      },
+      async reportUtilitiesIssue({
+        assetId,
+        resource,
+        title,
+        description,
+        priority,
+      }) {
+        if (!user) {
+          return {
+            data: null,
+            error: new Error('User is not authenticated'),
+          }
+        }
+
+        const severity = priority === 'high' ? 3 : priority === 'medium' ? 2 : 1
+        const eventResult = await eventService.create({
+          assetId,
+          createdBy: user.id,
+          title,
+          description,
+          eventType: 'utility',
+          severity,
+          startsAt: new Date().toISOString(),
+          isPublic: true,
+        })
+
+        if (eventResult.error || !eventResult.data) {
+          return {
+            data: null,
+            error: eventResult.error ?? new Error('Unable to create utility report event'),
+          }
+        }
+
+        const caseResult = await caseService.create({
+          eventId: eventResult.data.id,
+          createdBy: user.id,
+          assignedRole: 'akimat',
+          status: 'open',
+          priority,
+          visibility: 'public',
+        })
+
+        if (caseResult.error || !caseResult.data) {
+          return {
+            data: null,
+            error: caseResult.error ?? new Error('Unable to create utility report case'),
+          }
+        }
+
+        const observationResult = await observationService.create({
+          assetId,
+          caseId: caseResult.data.id,
+          createdBy: user.id,
+          payload: {
+            category: 'utility',
+            resource,
+            title,
+            priority,
+            description,
+          },
+          reviewStatus: 'pending',
+        })
+
+        if (observationResult.error) {
+          return {
+            data: null,
+            error: observationResult.error,
           }
         }
 

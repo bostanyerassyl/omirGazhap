@@ -14,6 +14,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import { StatusMessage } from "@/components/ui/status-message"
 import {
   AreaChart,
   Area,
@@ -29,105 +30,59 @@ import {
   Bar,
   Legend,
 } from "recharts"
+import type { IndustrialistFinancesData } from "@/types/dashboard"
 
-const revenueData = [
-  { month: "Jan", revenue: 245, expenses: 180, profit: 65 },
-  { month: "Feb", revenue: 268, expenses: 190, profit: 78 },
-  { month: "Mar", revenue: 295, expenses: 205, profit: 90 },
-  { month: "Apr", revenue: 280, expenses: 198, profit: 82 },
-  { month: "May", revenue: 320, expenses: 215, profit: 105 },
-  { month: "Jun", revenue: 310, expenses: 220, profit: 90 },
-  { month: "Jul", revenue: 345, expenses: 235, profit: 110 },
-  { month: "Aug", revenue: 365, expenses: 245, profit: 120 },
-  { month: "Sep", revenue: 340, expenses: 230, profit: 110 },
-  { month: "Oct", revenue: 380, expenses: 255, profit: 125 },
-  { month: "Nov", revenue: 395, expenses: 265, profit: 130 },
-  { month: "Dec", revenue: 420, expenses: 280, profit: 140 },
-]
+type FinancesSectionProps = {
+  data: IndustrialistFinancesData
+  onSendReport: () => Promise<void>
+}
 
-const expenseBreakdown = [
-  { name: "Raw Materials", value: 42, amount: 1176, color: "oklch(0.75 0.15 195)" },
-  { name: "Labor", value: 28, amount: 784, color: "oklch(0.65 0.15 160)" },
-  { name: "Energy", value: 15, amount: 420, color: "oklch(0.7 0.15 60)" },
-  { name: "Maintenance", value: 8, amount: 224, color: "oklch(0.6 0.15 300)" },
-  { name: "Other", value: 7, amount: 196, color: "oklch(0.55 0.1 30)" },
-]
-
-const quarterlyComparison = [
-  { quarter: "Q1", current: 882, previous: 780, growth: 13.1 },
-  { quarter: "Q2", current: 975, previous: 850, growth: 14.7 },
-  { quarter: "Q3", current: 1085, previous: 920, growth: 17.9 },
-  { quarter: "Q4", current: 1195, previous: 1050, growth: 13.8 },
-]
-
-const recentTransactions = [
-  { id: 1, type: "income", description: "Product Sales - Batch A-2024", amount: 45200, date: "2024-03-15" },
-  { id: 2, type: "expense", description: "Raw Materials - Steel Order", amount: 18500, date: "2024-03-14" },
-  { id: 3, type: "expense", description: "Energy Bill - February", amount: 12300, date: "2024-03-12" },
-  { id: 4, type: "income", description: "Contract Payment - City Project", amount: 85000, date: "2024-03-10" },
-  { id: 5, type: "expense", description: "Employee Salaries", amount: 42000, date: "2024-03-01" },
-]
-
-export function FinancesSection() {
+export function FinancesSection({ data, onSendReport }: FinancesSectionProps) {
   const [reportDialogOpen, setReportDialogOpen] = useState(false)
-  const [reportSent, setReportSent] = useState(false)
+  const [reporting, setReporting] = useState(false)
+  const [reportError, setReportError] = useState<string | null>(null)
 
-  const totalRevenue = revenueData.reduce((sum, d) => sum + d.revenue, 0)
-  const totalExpenses = revenueData.reduce((sum, d) => sum + d.expenses, 0)
-  const totalProfit = revenueData.reduce((sum, d) => sum + d.profit, 0)
-  const profitMargin = ((totalProfit / totalRevenue) * 100).toFixed(1)
-
-  const stats = [
-    {
-      label: "Annual Revenue",
-      value: `${(totalRevenue / 1000).toFixed(1)}M KZT`,
-      change: 15.2,
-      icon: DollarSign,
-      color: "text-emerald-400",
-    },
-    {
-      label: "Annual Expenses",
-      value: `${(totalExpenses / 1000).toFixed(1)}M KZT`,
-      change: 8.5,
-      icon: CreditCard,
-      color: "text-orange-400",
-    },
-    {
-      label: "Net Profit",
-      value: `${(totalProfit / 1000).toFixed(1)}M KZT`,
-      change: 22.3,
-      icon: PiggyBank,
-      color: "text-accent",
-    },
-    {
-      label: "Profit Margin",
-      value: `${profitMargin}%`,
-      change: 3.1,
-      icon: TrendingUp,
-      color: "text-blue-400",
-    },
-  ]
-
-  const handleSendReport = () => {
-    setReportSent(true)
-    setTimeout(() => {
+  const handleSendReport = async () => {
+    setReporting(true)
+    setReportError(null)
+    try {
+      await onSendReport()
       setReportDialogOpen(false)
-      setReportSent(false)
-    }, 2000)
+    } catch (reportError) {
+      setReportError(reportError instanceof Error ? reportError.message : "Unable to send financial report.")
+    } finally {
+      setReporting(false)
+    }
   }
 
   return (
     <div className="space-y-6">
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {stats.map((stat) => {
-          const Icon = stat.icon
+        {data.stats.map((stat) => {
+          const isRevenue = stat.label.includes("Revenue")
+          const isExpenses = stat.label.includes("Expenses")
+          const isProfit = stat.label.includes("Profit") && !stat.label.includes("Margin")
+          const Icon = isRevenue
+            ? DollarSign
+            : isExpenses
+              ? CreditCard
+              : isProfit
+                ? PiggyBank
+                : TrendingUp
+          const colorClass = isRevenue
+            ? "text-emerald-400"
+            : isExpenses
+              ? "text-orange-400"
+              : isProfit
+                ? "text-accent"
+                : "text-blue-400"
           return (
             <Card key={stat.label} className="bg-card border-border">
               <CardContent className="p-4">
                 <div className="flex items-start justify-between mb-3">
                   <div className="p-2 rounded-lg bg-secondary">
-                    <Icon className={`w-5 h-5 ${stat.color}`} />
+                    <Icon className={`w-5 h-5 ${colorClass}`} />
                   </div>
                   <div className={`flex items-center gap-1 text-sm ${
                     stat.change > 0 ? "text-emerald-400" : "text-red-400"
@@ -174,19 +129,19 @@ export function FinancesSection() {
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
                       <p className="text-muted-foreground">Total Revenue</p>
-                      <p className="font-semibold text-emerald-400">{(totalRevenue / 1000).toFixed(1)}M KZT</p>
+                      <p className="font-semibold text-emerald-400">{(data.summary.totalRevenue / 1000).toFixed(1)}M KZT</p>
                     </div>
                     <div>
                       <p className="text-muted-foreground">Total Expenses</p>
-                      <p className="font-semibold text-orange-400">{(totalExpenses / 1000).toFixed(1)}M KZT</p>
+                      <p className="font-semibold text-orange-400">{(data.summary.totalExpenses / 1000).toFixed(1)}M KZT</p>
                     </div>
                     <div>
                       <p className="text-muted-foreground">Net Profit</p>
-                      <p className="font-semibold text-accent">{(totalProfit / 1000).toFixed(1)}M KZT</p>
+                      <p className="font-semibold text-accent">{(data.summary.totalProfit / 1000).toFixed(1)}M KZT</p>
                     </div>
                     <div>
                       <p className="text-muted-foreground">Taxes Paid</p>
-                      <p className="font-semibold">287M KZT</p>
+                      <p className="font-semibold">{data.summary.taxesPaid.toLocaleString()} KZT</p>
                     </div>
                   </div>
                 </div>
@@ -200,20 +155,15 @@ export function FinancesSection() {
                     <li>- Investment plans</li>
                   </ul>
                 </div>
-                {reportSent ? (
-                  <div className="flex items-center justify-center gap-2 p-4 bg-emerald-500/20 rounded-lg text-emerald-400">
-                    <TrendingUp className="w-5 h-5" />
-                    Report sent successfully!
-                  </div>
-                ) : (
-                  <Button 
-                    onClick={handleSendReport}
-                    className="w-full bg-accent text-accent-foreground hover:bg-accent/90"
-                  >
-                    <Send className="w-4 h-4 mr-2" />
-                    Confirm & Send Report
-                  </Button>
-                )}
+                {reportError ? <StatusMessage tone="error">{reportError}</StatusMessage> : null}
+                <Button 
+                  onClick={() => void handleSendReport()}
+                  className="w-full bg-accent text-accent-foreground hover:bg-accent/90"
+                  disabled={reporting}
+                >
+                  <Send className="w-4 h-4 mr-2" />
+                  {reporting ? "Sending..." : "Confirm & Send Report"}
+                </Button>
               </div>
             </DialogContent>
           </Dialog>
@@ -221,7 +171,7 @@ export function FinancesSection() {
         <CardContent>
           <div className="h-[350px]">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={revenueData}>
+              <AreaChart data={data.monthly}>
                 <defs>
                   <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="oklch(0.7 0.15 140)" stopOpacity={0.3} />
@@ -292,7 +242,7 @@ export function FinancesSection() {
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
-                      data={expenseBreakdown}
+                      data={data.expenseBreakdown}
                       cx="50%"
                       cy="50%"
                       innerRadius={50}
@@ -300,7 +250,7 @@ export function FinancesSection() {
                       paddingAngle={2}
                       dataKey="value"
                     >
-                      {expenseBreakdown.map((entry, index) => (
+                      {data.expenseBreakdown.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.color} />
                       ))}
                     </Pie>
@@ -317,7 +267,7 @@ export function FinancesSection() {
                 </ResponsiveContainer>
               </div>
               <div className="w-full md:w-1/2 space-y-3">
-                {expenseBreakdown.map((item) => {
+                {data.expenseBreakdown.map((item) => {
                   const icons: Record<string, typeof Building> = {
                     "Raw Materials": Package,
                     "Labor": Users,
@@ -356,7 +306,7 @@ export function FinancesSection() {
           <CardContent>
             <div className="h-[220px]">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={quarterlyComparison}>
+                <BarChart data={data.quarterly}>
                   <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.3 0.005 260)" />
                   <XAxis dataKey="quarter" stroke="oklch(0.5 0 0)" fontSize={12} />
                   <YAxis stroke="oklch(0.5 0 0)" fontSize={12} />
@@ -386,7 +336,7 @@ export function FinancesSection() {
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
-            {recentTransactions.map((tx) => (
+            {data.transactions.map((tx) => (
               <div
                 key={tx.id}
                 className="flex items-center justify-between p-3 bg-secondary/50 rounded-lg"
