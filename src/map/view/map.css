@@ -300,6 +300,18 @@ body.sidebar-open #sidebar {
   background: #0b1220;
 }
 
+.obs-group {
+  border: 1px dashed #334155;
+  border-radius: 8px;
+  padding: 6px;
+}
+
+.obs-group-title {
+  font-size: 11px;
+  color: #93c5fd;
+  margin-bottom: 6px;
+}
+
 .obs-time {
   font-size: 11px;
   color: #94a3b8;
