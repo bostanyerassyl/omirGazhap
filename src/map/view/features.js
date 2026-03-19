@@ -79,6 +79,7 @@ export async function loadFeatures() {
         image:       row.image,
         icon:        null,
         icon_url:    null,
+        asset_id:    row.asset_id,
       }
     }))
   };
@@ -95,6 +96,7 @@ export async function saveFeature(feature) {
     description: feature.properties.description ?? null,
     color:       feature.properties.color       ?? null,
     image:       feature.properties.image       ?? null,
+    asset_id:    feature.properties.asset_id    ?? null,
   });
   if (error) {
     console.error('saveFeature error:', error.message);
@@ -152,7 +154,7 @@ export async function openFeatureSidebar(feature, draw, map) {
 
   const { data } = await supabase
     .from('Map Features')
-    .select('title, description, color, image')
+    .select('title, description, color, image, asset_id')
     .eq('id', dbId)
     .maybeSingle();
 
@@ -167,6 +169,10 @@ export async function openFeatureSidebar(feature, draw, map) {
 
   setActiveBanner(data?.image ?? null);
   renderBanner();
+  
+  if (data?.asset_id) {
+    activeFeature.properties.asset_id = data.asset_id;
+  }
 
   const icon    = activeFeature.properties?.icon     ?? null;
   const iconUrl = activeFeature.properties?.icon_url ?? null;
