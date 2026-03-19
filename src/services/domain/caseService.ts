@@ -115,4 +115,51 @@ export const caseService = {
       }
     }
   },
+
+  async create(input: {
+    eventId?: string | null
+    createdBy?: string | null
+    assignedTo?: string | null
+    assignedRole: Role | 'resident'
+    status?: CaseStatus
+    priority?: CasePriority
+    visibility?: CaseVisibility
+  }): Promise<AuthResult<CaseItem>> {
+    try {
+      const payload = {
+        event_id: input.eventId ?? null,
+        created_by: input.createdBy ?? null,
+        assigned_to: input.assignedTo ?? null,
+        assigned_role: input.assignedRole === 'user' ? 'resident' : input.assignedRole,
+        status: input.status ?? 'open',
+        priority: input.priority ?? 'medium',
+        visibility: input.visibility ?? 'public',
+      }
+
+      const { data, error } = await supabase
+        .from('cases')
+        .insert(payload)
+        .select('*')
+        .single<CaseRecord>()
+
+      if (error) {
+        return {
+          data: null,
+          error,
+        }
+      }
+
+      return {
+        data: mapCase(data),
+        error: null,
+      }
+    } catch (error) {
+      const normalizedError = toError(error)
+      logger.error(normalizedError, 'case.create')
+      return {
+        data: null,
+        error: normalizedError,
+      }
+    }
+  },
 }

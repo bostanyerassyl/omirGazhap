@@ -25,8 +25,13 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet"
+import type { ConstructionObject } from "@/types/dashboard"
 
-export function DeveloperProfile() {
+type DeveloperProfileProps = {
+  objects: ConstructionObject[]
+}
+
+export function DeveloperProfile({ objects }: DeveloperProfileProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
@@ -134,7 +139,7 @@ export function DeveloperProfile() {
       <SheetTrigger asChild>
         <button className="h-10 w-10 rounded-full bg-card border border-border hover:border-accent/50 transition-colors flex items-center justify-center">
           <Avatar className="h-9 w-9">
-            <AvatarImage src="/placeholder.svg" alt="Developer" />
+            <AvatarImage src={profile.avatar} alt={profile.companyName} />
             <AvatarFallback className="bg-accent/20 text-accent text-sm font-medium">
               AD
             </AvatarFallback>
@@ -285,16 +290,27 @@ export function DeveloperProfile() {
           {/* Stats */}
           <div className="grid grid-cols-3 gap-3">
             <div className="bg-card border border-border rounded-lg p-3 text-center">
-              <p className="text-2xl font-semibold text-accent">5</p>
+              <p className="text-2xl font-semibold text-accent">
+                {objects.filter((item) => item.status !== "completed").length}
+              </p>
               <p className="text-xs text-muted-foreground">Active Projects</p>
             </div>
             <div className="bg-card border border-border rounded-lg p-3 text-center">
-              <p className="text-2xl font-semibold text-emerald-400">12</p>
+              <p className="text-2xl font-semibold text-emerald-400">
+                {objects.filter((item) => item.status === "completed").length}
+              </p>
               <p className="text-xs text-muted-foreground">Completed</p>
             </div>
             <div className="bg-card border border-border rounded-lg p-3 text-center">
-              <p className="text-2xl font-semibold text-foreground">4.8</p>
-              <p className="text-xs text-muted-foreground">Rating</p>
+              <p className="text-2xl font-semibold text-foreground">
+                {objects.length
+                  ? Math.round(
+                      objects.reduce((sum, item) => sum + item.progress, 0) / objects.length,
+                    )
+                  : 0}
+                %
+              </p>
+              <p className="text-xs text-muted-foreground">Avg. Progress</p>
             </div>
           </div>
         </div>

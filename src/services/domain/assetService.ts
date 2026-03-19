@@ -10,6 +10,12 @@ type AssetRecord = {
   created_by: string | null
   owner_profile_id: string | null
   owner_role: string | null
+  name: string | null
+  address: string | null
+  description: string | null
+  contact_phone: string | null
+  deadline: string | null
+  progress: number | null
   type: string | null
   status: string | null
   created_at: string | null
@@ -31,11 +37,51 @@ function mapAsset(record: AssetRecord): AssetItem {
     createdBy: record.created_by,
     ownerProfileId: record.owner_profile_id,
     ownerRole: record.owner_role,
+    name: record.name,
+    address: record.address,
+    description: record.description,
+    contactPhone: record.contact_phone,
+    deadline: record.deadline,
+    progress: record.progress,
     type: record.type ?? 'asset',
     status: record.status ?? 'active',
     createdAt: record.created_at ?? '',
     updatedAt: record.updated_at ?? '',
   }
+}
+
+type AssetMutationInput = {
+  locationId?: string | null
+  createdBy?: string | null
+  ownerProfileId?: string | null
+  ownerRole?: string | null
+  name?: string | null
+  address?: string | null
+  description?: string | null
+  contactPhone?: string | null
+  deadline?: string | null
+  progress?: number | null
+  type?: string | null
+  status?: string | null
+}
+
+function serializeAssetMutation(input: AssetMutationInput) {
+  const payload: Record<string, string | number | null> = {}
+
+  if (input.locationId !== undefined) payload.location_id = input.locationId
+  if (input.createdBy !== undefined) payload.created_by = input.createdBy
+  if (input.ownerProfileId !== undefined) payload.owner_profile_id = input.ownerProfileId
+  if (input.ownerRole !== undefined) payload.owner_role = input.ownerRole
+  if (input.name !== undefined) payload.name = input.name
+  if (input.address !== undefined) payload.address = input.address
+  if (input.description !== undefined) payload.description = input.description
+  if (input.contactPhone !== undefined) payload.contact_phone = input.contactPhone
+  if (input.deadline !== undefined) payload.deadline = input.deadline
+  if (input.progress !== undefined) payload.progress = input.progress
+  if (input.type !== undefined) payload.type = input.type
+  if (input.status !== undefined) payload.status = input.status
+
+  return payload
 }
 
 export const assetService = {
@@ -74,6 +120,65 @@ export const assetService = {
     } catch (error) {
       const normalizedError = toError(error)
       logger.error(normalizedError, 'asset.list')
+      return {
+        data: null,
+        error: normalizedError,
+      }
+    }
+  },
+
+  async create(input: AssetMutationInput): Promise<AuthResult<AssetItem>> {
+    try {
+      const { data, error } = await supabase
+        .from('assets')
+        .insert(serializeAssetMutation(input))
+        .select('*, locations(name, lat, lon)')
+        .single<AssetRecord>()
+
+      if (error) {
+        return {
+          data: null,
+          error,
+        }
+      }
+
+      return {
+        data: mapAsset(data),
+        error: null,
+      }
+    } catch (error) {
+      const normalizedError = toError(error)
+      logger.error(normalizedError, 'asset.create')
+      return {
+        data: null,
+        error: normalizedError,
+      }
+    }
+  },
+
+  async update(id: string, input: AssetMutationInput): Promise<AuthResult<AssetItem>> {
+    try {
+      const { data, error } = await supabase
+        .from('assets')
+        .update(serializeAssetMutation(input))
+        .eq('id', id)
+        .select('*, locations(name, lat, lon)')
+        .single<AssetRecord>()
+
+      if (error) {
+        return {
+          data: null,
+          error,
+        }
+      }
+
+      return {
+        data: mapAsset(data),
+        error: null,
+      }
+    } catch (error) {
+      const normalizedError = toError(error)
+      logger.error(normalizedError, 'asset.update')
       return {
         data: null,
         error: normalizedError,

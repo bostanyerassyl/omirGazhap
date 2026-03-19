@@ -8,12 +8,23 @@ export type ConstructionStatus =
 
 export type ConstructionObject = {
   id: string
+  locationId: string | null
+  type: string
   name: string
   address: string
+  description: string
+  contactPhone: string
+  developerName: string
   status: ConstructionStatus
   deadline: string
   progress: number
   coordinates: { lat: number; lng: number }
+  reports: Array<{
+    id: string
+    title: string
+    status: string
+    date: string
+  }>
 }
 
 export type DashboardEvent = {

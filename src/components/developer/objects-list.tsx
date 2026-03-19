@@ -32,12 +32,14 @@ const statusConfig = {
 interface ObjectsListProps {
   objects: ConstructionObject[]
   onSelectObject: (obj: ConstructionObject) => void
+  onAddObject: () => void
   selectedObjectId?: string
 }
 
 export function ObjectsList({
   objects,
   onSelectObject,
+  onAddObject,
   selectedObjectId,
 }: ObjectsListProps) {
   const [searchQuery, setSearchQuery] = useState("")
@@ -85,6 +87,14 @@ export function ObjectsList({
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 space-y-3 max-h-[calc(100vh-220px)]">
+          {!filteredObjects.length ? (
+            <div className="rounded-lg border border-dashed border-border p-6 text-center">
+              <p className="text-sm font-medium text-foreground">No construction objects yet</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Add your first tracked object to start using the developer dashboard.
+              </p>
+            </div>
+          ) : null}
           {filteredObjects.map((obj) => {
             const status = statusConfig[obj.status]
             const StatusIcon = status.icon
@@ -138,7 +148,10 @@ export function ObjectsList({
         </div>
 
         <div className="p-4 border-t border-border">
-          <Button className="w-full bg-accent text-accent-foreground hover:bg-accent/90">
+          <Button
+            className="w-full bg-accent text-accent-foreground hover:bg-accent/90"
+            onClick={onAddObject}
+          >
             <Plus className="h-4 w-4 mr-2" />
             Add New Object
           </Button>

@@ -104,4 +104,57 @@ export const eventService = {
       }
     }
   },
+
+  async create(input: {
+    assetId?: string | null
+    locationId?: string | null
+    createdBy?: string | null
+    title?: string | null
+    description?: string | null
+    eventType?: string | null
+    severity?: number | null
+    startsAt?: string | null
+    endsAt?: string | null
+    isPublic?: boolean | null
+  }): Promise<AuthResult<EventItem>> {
+    try {
+      const payload: Record<string, string | number | boolean | null> = {
+        asset_id: input.assetId ?? null,
+        location_id: input.locationId ?? null,
+        created_by: input.createdBy ?? null,
+        title: input.title ?? null,
+        description: input.description ?? null,
+        event_type: input.eventType ?? 'construction',
+        severity: input.severity ?? 2,
+        starts_at: input.startsAt ?? new Date().toISOString(),
+        ends_at: input.endsAt ?? null,
+        is_public: input.isPublic ?? true,
+      }
+
+      const { data, error } = await supabase
+        .from('events')
+        .insert(payload)
+        .select('*, locations(name)')
+        .single<EventRecord>()
+
+      if (error) {
+        return {
+          data: null,
+          error,
+        }
+      }
+
+      return {
+        data: mapEvent(data),
+        error: null,
+      }
+    } catch (error) {
+      const normalizedError = toError(error)
+      logger.error(normalizedError, 'event.create')
+      return {
+        data: null,
+        error: normalizedError,
+      }
+    }
+  },
 }

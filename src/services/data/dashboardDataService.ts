@@ -236,30 +236,102 @@ function buildDashboardEvents(events: EventItem[]): DashboardEvent[] {
   })
 }
 
-function buildConstructionObjects(assets: AssetItem[]): ConstructionObject[] {
-  return assets.slice(0, 12).map((asset, index) => {
-    const statusCycle: ConstructionObject['status'][] = [
-      'planning',
-      'in-progress',
-      'completed',
-      'delayed',
-    ]
-    const derivedStatus = statusCycle[index % statusCycle.length]
-    const createdAt = asset.createdAt ? new Date(asset.createdAt) : new Date()
-    const deadline = new Date(createdAt)
-    deadline.setDate(deadline.getDate() + 90)
+function normalizeConstructionStatus(status: string): ConstructionObject['status'] {
+  const normalized = status.toLowerCase()
+
+  if (normalized.includes('complete')) {
+    return 'completed'
+  }
+
+  if (normalized.includes('delay')) {
+    return 'delayed'
+  }
+
+  if (normalized.includes('plan')) {
+    return 'planning'
+  }
+
+  return 'in-progress'
+}
+
+function isDeveloperProjectAsset(asset: AssetItem) {
+  const normalizedType = asset.type.toLowerCase()
+  const operationalKeywords = ['camera', 'traffic_light', 'traffic light', 'sensor', 'generic']
+
+  if (operationalKeywords.some((keyword) => normalizedType.includes(keyword))) {
+    return false
+  }
+
+  return true
+}
+
+function buildConstructionObjects(
+  assets: AssetItem[],
+  events: EventItem[],
+  cases: CaseItem[],
+  profilesMap: Record<string, Profile>,
+  currentProfile: Profile | null,
+): ConstructionObject[] {
+  return assets
+    .filter(isDeveloperProjectAsset)
+    .slice(0, 20)
+    .map((asset) => {
+      const createdAt = asset.createdAt ? new Date(asset.createdAt) : new Date()
+    const fallbackDeadline = new Date(createdAt)
+    fallbackDeadline.setDate(fallbackDeadline.getDate() + 90)
+    const relatedReports = cases
+      .filter((item) => {
+        const relatedEvent = events.find((event) => event.id === item.eventId)
+        return relatedEvent?.assetId === asset.id
+      })
+      .slice(0, 6)
+      .map((item) => {
+        const relatedEvent = events.find((event) => event.id === item.eventId)
+
+        return {
+          id: item.id,
+          title: relatedEvent?.title || `Report ${item.id.slice(0, 8)}`,
+          status: item.status.replace('_', ' '),
+          date: formatTimestamp(item.createdAt),
+        }
+      })
+
+    const ownerProfile =
+      (asset.ownerProfileId && profilesMap[asset.ownerProfileId]) ||
+      (asset.createdBy && profilesMap[asset.createdBy]) ||
+      currentProfile
 
     return {
       id: asset.id,
-      name: `${asset.type.charAt(0).toUpperCase()}${asset.type.slice(1)} Asset`,
-      address: asset.locationName ?? 'Unassigned location',
-      status: asset.status === 'active' ? derivedStatus : 'delayed',
-      deadline: deadline.toISOString().slice(0, 10),
-      progress: asset.status === 'active' ? 55 : 25,
+      locationId: asset.locationId,
+      type: asset.type,
+      name:
+        asset.name ||
+        `${asset.type.charAt(0).toUpperCase()}${asset.type.slice(1)} Object`,
+      address: asset.address || asset.locationName || 'Unassigned location',
+      description:
+        asset.description || `Tracked ${asset.type} project in the developer registry.`,
+      contactPhone: asset.contactPhone || ownerProfile?.phone || '',
+      developerName:
+        ownerProfile?.companyName || ownerProfile?.fullName || 'Developer account',
+      status: normalizeConstructionStatus(asset.status),
+      deadline:
+        asset.deadline ||
+        fallbackDeadline.toISOString().slice(0, 10),
+      progress:
+        asset.progress ??
+        (normalizeConstructionStatus(asset.status) === 'completed'
+          ? 100
+          : normalizeConstructionStatus(asset.status) === 'planning'
+            ? 15
+            : normalizeConstructionStatus(asset.status) === 'delayed'
+              ? 35
+              : 60),
       coordinates: {
         lat: asset.latitude ?? 43.238949,
         lng: asset.longitude ?? 76.889709,
       },
+      reports: relatedReports,
     }
   })
 }
@@ -1051,9 +1123,11 @@ async function buildDashboardData(
   const observations = observationsResult.data ?? []
   const locations = locationsResult.data ?? []
   const shouldLoadAdminProfiles = role === 'admin'
+  const shouldLoadDeveloperProfiles = role === 'developer'
   const shouldLoadTotalUsers = role === 'admin'
   const shouldLoadCurrentProfile =
-    (role === 'industrialist' || role === 'akimat') && Boolean(userId)
+    (role === 'industrialist' || role === 'akimat' || role === 'developer') &&
+    Boolean(userId)
   const shouldLoadRoleRequests = role === 'admin'
   const shouldLoadAkimatProfiles = role === 'akimat'
 
@@ -1068,7 +1142,8 @@ async function buildDashboardData(
     }
   }
 
-  const actorProfilesResult = shouldLoadAdminProfiles || shouldLoadAkimatProfiles
+  const actorProfilesResult =
+    shouldLoadAdminProfiles || shouldLoadAkimatProfiles || shouldLoadDeveloperProfiles
     ? await loadActorProfiles([
         ...cases.map((item) => item.createdBy),
         ...observations.map((item) => item.createdBy),
@@ -1142,7 +1217,13 @@ async function buildDashboardData(
         events: buildDashboardEvents(events),
       },
       developer: {
-        objects: buildConstructionObjects(assets),
+        objects: buildConstructionObjects(
+          assets,
+          events,
+          cases,
+          profilesMap,
+          currentProfileResult.data,
+        ),
       },
       akimat: {
         quickStats: buildQuickStats(assets, cases, events, observations),
