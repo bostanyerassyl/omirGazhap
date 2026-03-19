@@ -1062,6 +1062,29 @@ export async function setupDraw(map) {
 
   await initTrafficLights({ draw, map });
 
+  // Subscribe to Map Features updates from the simulator
+  supabase.channel('map-features-sync')
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'Map Features' }, (payload) => {
+      const dbId = payload.new?.id;
+      if (!dbId) return;
+      
+      // Find the local draw feature ID
+      const drawId = [...drawIdToDbId.entries()].find(([k, v]) => v === dbId)?.[0];
+      if (!drawId) return;
+      
+      // Sync color
+      const newColor = payload.new.color ?? DEFAULT_FEATURE_COLOR;
+      safeSetFeatureProperty(draw, drawId, 'color', newColor);
+      
+      // Sync icon immediately
+      if (payload.new.type === 'Point' && payload.new.icon) {
+         updateIconMarker(map, drawId, payload.new.geometry.coordinates, payload.new.icon, payload.new.icon_url);
+      }
+      
+      map.triggerRepaint();
+    })
+    .subscribe();
+
   // Toolbar mode buttons
   document.querySelectorAll('.draw-btn').forEach(btn => {
     btn.addEventListener('click', () => {

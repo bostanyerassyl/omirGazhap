@@ -17,7 +17,7 @@ SUPABASE_KEY = 'sb_publishable_RzNSGBsRw82CiiLcFkJJhg_gcEJLRvy'
 CENTER_LAT = 43.673943872429916
 CENTER_LON = 77.10766431791033
 
-def generate_random_point(center_lat, center_lon, radius_km=1.0):
+def generate_random_point(center_lat, center_lon, radius_km=4.0):
     """Генерация случайной точки в заданном радиусе (в км) от центра."""
     earth_radius = 6371.0
     
@@ -55,7 +55,7 @@ def setup_infrastructure(supabase: Client):
         'gas_meter': '🔥'
     }
     
-    for i in range(1, 16):
+    for i in range(1, 100):
         try:
             lat, lon = generate_random_point(CENTER_LAT, CENTER_LON, radius_km=1.0)
             sensor_type = random.choice(sensor_types)
