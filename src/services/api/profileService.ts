@@ -11,8 +11,31 @@ import { toError } from '@/utils/error'
 import { supabase } from '../supabaseClient'
 
 function normalizeRole(role: ProfileDbRole | null): Role | null {
-  if (role === 'resident') {
-    return 'user'
+  switch (role) {
+    case 'resident':
+      return 'user'
+    case 'developer':
+    case 'industrialist':
+    case 'utilities':
+    case 'akimat':
+    case 'admin':
+      return role
+    default:
+      return null
+  }
+}
+
+function serializeRole(role: Role | null | undefined): ProfileDbRole | null | undefined {
+  if (role === undefined) {
+    return undefined
+  }
+
+  if (role === null) {
+    return null
+  }
+
+  if (role === 'user') {
+    return 'resident'
   }
 
   return role
@@ -30,15 +53,16 @@ function normalizeProfile(record: ProfileRecord): Profile {
     avatarUrl: record.avatar_url ?? '',
     companyName: record.company_name ?? '',
     licenseNumber: record.license_number ?? '',
+    createdAt: record.created_at ?? null,
+    updatedAt: record.updated_at ?? null,
   }
 }
 
 function serializeProfileInput(data: ProfileCreateInput | ProfileUpdateInput) {
   const payload: Partial<ProfileRecord> = {}
 
-  if (data.email !== undefined) payload.email = data.email
   if (data.fullName !== undefined) payload.full_name = data.fullName
-  if (data.role !== undefined) payload.role = data.role
+  if (data.role !== undefined) payload.role = serializeRole(data.role)
   if (data.phone !== undefined) payload.phone = data.phone
   if (data.address !== undefined) payload.address = data.address
   if (data.bio !== undefined) payload.bio = data.bio
@@ -90,6 +114,90 @@ export async function getProfile(userId: string): Promise<AuthResult<Profile>> {
   }
 }
 
+export async function listProfiles(): Promise<AuthResult<Profile[]>> {
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .order('updated_at', { ascending: false })
+      .returns<ProfileRecord[]>()
+
+    if (error) {
+      return {
+        data: null,
+        error,
+      }
+    }
+
+    return {
+      data: (data ?? []).map(normalizeProfile),
+      error: null,
+    }
+  } catch (error) {
+    return toProfileError<Profile[]>(error, 'profile.list')
+  }
+}
+
+export async function listProfilesByIds(
+  userIds: string[],
+): Promise<AuthResult<Record<string, Profile>>> {
+  if (userIds.length === 0) {
+    return {
+      data: {},
+      error: null,
+    }
+  }
+
+  try {
+    const uniqueIds = Array.from(new Set(userIds))
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .in('id', uniqueIds)
+      .returns<ProfileRecord[]>()
+
+    if (error) {
+      return {
+        data: null,
+        error,
+      }
+    }
+
+    return {
+      data: (data ?? []).reduce<Record<string, Profile>>((accumulator, profile) => {
+        const normalizedProfile = normalizeProfile(profile)
+        accumulator[normalizedProfile.id] = normalizedProfile
+        return accumulator
+      }, {}),
+      error: null,
+    }
+  } catch (error) {
+    return toProfileError<Record<string, Profile>>(error, 'profile.listByIds')
+  }
+}
+
+export async function countProfiles(): Promise<AuthResult<number>> {
+  try {
+    const { count, error } = await supabase
+      .from('profiles')
+      .select('id', { count: 'exact', head: true })
+
+    if (error) {
+      return {
+        data: null,
+        error,
+      }
+    }
+
+    return {
+      data: count ?? 0,
+      error: null,
+    }
+  } catch (error) {
+    return toProfileError<number>(error, 'profile.count')
+  }
+}
+
 export async function createProfile(
   userId: string,
   initialData: ProfileCreateInput,
@@ -97,6 +205,7 @@ export async function createProfile(
   try {
     const payload = {
       id: userId,
+      ...(initialData.email !== undefined ? { email: initialData.email } : {}),
       ...serializeProfileInput(initialData),
     }
 

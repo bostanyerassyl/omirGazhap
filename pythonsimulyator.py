@@ -49,6 +49,11 @@ def setup_infrastructure(supabase: Client):
         'electricity_meter': 'Счетчик электричества',
         'gas_meter': 'Счетчик газа'
     }
+    type_icons = {
+        'water_meter': '💦',
+        'electricity_meter': '⚡',
+        'gas_meter': '🔥'
+    }
     
     for i in range(1, 16):
         try:
@@ -75,6 +80,7 @@ def setup_infrastructure(supabase: Client):
                     "coordinates": [lon, lat] # Внимание: долгота первая!
                 },
                 "title": f"{type_names[sensor_type]} #{i}",
+                "icon": type_icons[sensor_type], # Добавляем иконку
                 "asset_id": asset_id # Связываем карту и логику
             }
             supabase.table("Map Features").insert(feature_data).execute()

@@ -52,12 +52,13 @@ export function getUserProfileData(
   const defaults = defaultProfiles[role]
   const fullName = profile.fullName || defaults.name
   const email = profile.email
-  const initials = fullName
-    .split(' ')
-    .map((part) => part[0])
-    .join('')
-    .slice(0, 2)
-    .toUpperCase() || defaults.initials
+  const initials =
+    fullName
+      .split(' ')
+      .map((part) => part[0])
+      .join('')
+      .slice(0, 2)
+      .toUpperCase() || defaults.initials
 
   return {
     name: fullName,

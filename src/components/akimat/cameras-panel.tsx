@@ -1,63 +1,45 @@
-import { useState } from "react"
-import { 
-  Camera, 
+import { useState } from 'react'
+import {
+  Camera,
   Video,
   MapPin,
   Maximize2,
   Grid3X3,
   List,
   Search,
-  X,
   Play,
   Pause,
   RotateCcw,
   ChevronLeft,
-  ChevronRight
-} from "lucide-react"
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
-import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
-import { cn } from "@/utils/cn"
-
-interface CameraFeed {
-  id: string
-  name: string
-  location: string
-  type: "road" | "courtyard" | "building" | "street"
-  status: "online" | "offline" | "maintenance"
-  thumbnail: string
-}
-
-const cameras: CameraFeed[] = [
-  { id: "1", name: "Nazarbayev Ave - Intersection 1", location: "Nazarbayev Ave & Abay St", type: "road", status: "online", thumbnail: "road" },
-  { id: "2", name: "Central Park Entrance", location: "Al-Farabi Ave, 200", type: "street", status: "online", thumbnail: "street" },
-  { id: "3", name: "Residential Block A - Courtyard", location: "Tole Bi St, 45", type: "courtyard", status: "online", thumbnail: "courtyard" },
-  { id: "4", name: "Business Center - Lobby", location: "Dostyk St, 78", type: "building", status: "online", thumbnail: "building" },
-  { id: "5", name: "School #45 - Entrance", location: "Zhandosov St, 12", type: "building", status: "online", thumbnail: "building" },
-  { id: "6", name: "Satpayev St - Traffic", location: "Satpayev St & Seifullin Ave", type: "road", status: "online", thumbnail: "road" },
-  { id: "7", name: "Almaly District - Main Square", location: "Almaly Square", type: "street", status: "maintenance", thumbnail: "street" },
-  { id: "8", name: "Residential Block B - Parking", location: "Baitursynov St, 89", type: "courtyard", status: "online", thumbnail: "courtyard" },
-  { id: "9", name: "Highway M39 - Entrance", location: "M39 City Entrance", type: "road", status: "online", thumbnail: "road" },
-  { id: "10", name: "Metro Station - Platform", location: "Abay Metro Station", type: "building", status: "offline", thumbnail: "building" },
-  { id: "11", name: "Bostandyk Market", location: "Bostandyk District", type: "street", status: "online", thumbnail: "street" },
-  { id: "12", name: "Industrial Zone Gate", location: "Industrial Ave, 1", type: "road", status: "online", thumbnail: "road" },
-]
+  ChevronRight,
+} from 'lucide-react'
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
+import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
+import { cn } from '@/utils/cn'
+import type { AkimatCameraFeed } from '@/types/dashboard'
 
 const typeFilters = [
-  { value: "all", label: "All Cameras" },
-  { value: "road", label: "Roads" },
-  { value: "street", label: "Streets" },
-  { value: "courtyard", label: "Courtyards" },
-  { value: "building", label: "Buildings" },
+  { value: 'all', label: 'All Cameras' },
+  { value: 'road', label: 'Roads' },
+  { value: 'street', label: 'Streets' },
+  { value: 'courtyard', label: 'Courtyards' },
+  { value: 'building', label: 'Buildings' },
 ]
 
 const statusColors = {
-  online: "bg-green-500",
-  offline: "bg-red-500",
-  maintenance: "bg-amber-500",
+  online: 'bg-green-500',
+  offline: 'bg-red-500',
+  maintenance: 'bg-amber-500',
 }
 
-function CameraPreview({ camera, onClick }: { camera: CameraFeed; onClick: () => void }) {
+function CameraPreview({
+  camera,
+  onClick,
+}: {
+  camera: AkimatCameraFeed
+  onClick: () => void
+}) {
   return (
     <button
       onClick={onClick}
@@ -119,27 +101,35 @@ function CameraPreview({ camera, onClick }: { camera: CameraFeed; onClick: () =>
   )
 }
 
-export function CamerasPanel() {
-  const [search, setSearch] = useState("")
-  const [filter, setFilter] = useState("all")
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
-  const [selectedCamera, setSelectedCamera] = useState<CameraFeed | null>(null)
+type CamerasPanelProps = {
+  cameras: AkimatCameraFeed[]
+}
+
+export function CamerasPanel({ cameras }: CamerasPanelProps) {
+  const [search, setSearch] = useState('')
+  const [filter, setFilter] = useState('all')
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
+  const [selectedCamera, setSelectedCamera] = useState<AkimatCameraFeed | null>(null)
   const [isPlaying, setIsPlaying] = useState(true)
 
-  const filteredCameras = cameras.filter(c => {
-    const matchesSearch = c.name.toLowerCase().includes(search.toLowerCase()) ||
-                          c.location.toLowerCase().includes(search.toLowerCase())
-    const matchesFilter = filter === "all" || c.type === filter
+  const filteredCameras = cameras.filter((camera) => {
+    const matchesSearch =
+      camera.name.toLowerCase().includes(search.toLowerCase()) ||
+      camera.location.toLowerCase().includes(search.toLowerCase())
+    const matchesFilter = filter === 'all' || camera.type === filter
     return matchesSearch && matchesFilter
   })
 
   const stats = {
     total: cameras.length,
-    online: cameras.filter(c => c.status === "online").length,
-    offline: cameras.filter(c => c.status === "offline").length,
+    online: cameras.filter((camera) => camera.status === 'online').length,
+    offline: cameras.filter((camera) => camera.status === 'offline').length,
+    maintenance: cameras.filter((camera) => camera.status === 'maintenance').length,
   }
 
-  const currentIndex = selectedCamera ? filteredCameras.findIndex(c => c.id === selectedCamera.id) : -1
+  const currentIndex = selectedCamera
+    ? filteredCameras.findIndex((camera) => camera.id === selectedCamera.id)
+    : -1
 
   const goToNext = () => {
     if (currentIndex < filteredCameras.length - 1) {
@@ -271,8 +261,8 @@ export function CamerasPanel() {
                     key={camera.id}
                     onClick={() => setSelectedCamera(camera)}
                     className={cn(
-                      "flex-shrink-0 w-24 h-16 bg-secondary rounded overflow-hidden border-2 transition-colors",
-                      selectedCamera.id === camera.id ? "border-accent" : "border-transparent"
+                      'flex-shrink-0 w-24 h-16 bg-secondary rounded overflow-hidden border-2 transition-colors',
+                      selectedCamera.id === camera.id ? 'border-accent' : 'border-transparent',
                     )}
                   >
                     <div className="w-full h-full bg-gradient-to-br from-secondary to-background flex items-center justify-center">
@@ -286,7 +276,7 @@ export function CamerasPanel() {
         ) : (
           <div className="p-4 space-y-4 h-[calc(100vh-80px)] overflow-y-auto">
             {/* Stats */}
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-4 gap-2">
               <div className="bg-secondary/50 rounded-lg p-3 text-center">
                 <div className="text-2xl font-bold">{stats.total}</div>
                 <div className="text-xs text-muted-foreground">Total Cameras</div>
@@ -298,6 +288,10 @@ export function CamerasPanel() {
               <div className="bg-red-500/10 rounded-lg p-3 text-center">
                 <div className="text-2xl font-bold text-red-400">{stats.offline}</div>
                 <div className="text-xs text-muted-foreground">Offline</div>
+              </div>
+              <div className="bg-amber-500/10 rounded-lg p-3 text-center">
+                <div className="text-2xl font-bold text-amber-400">{stats.maintenance}</div>
+                <div className="text-xs text-muted-foreground">Maintenance</div>
               </div>
             </div>
 
@@ -346,42 +340,46 @@ export function CamerasPanel() {
               ))}
             </div>
 
-            {/* Camera Grid/List */}
-            {viewMode === "grid" ? (
-              <div className="grid grid-cols-2 gap-3">
-                {filteredCameras.map((camera) => (
-                  <CameraPreview
-                    key={camera.id}
-                    camera={camera}
-                    onClick={() => setSelectedCamera(camera)}
-                  />
-                ))}
+            {filteredCameras.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+                No cameras found. Add camera-type assets in the database and they will appear here.
               </div>
             ) : (
-              <div className="space-y-2">
-                {filteredCameras.map((camera) => (
-                  <button
-                    key={camera.id}
-                    onClick={() => setSelectedCamera(camera)}
-                    className="w-full flex items-center gap-3 p-3 bg-card hover:bg-secondary/50 border border-border rounded-lg transition-colors"
-                  >
-                    <div className="w-20 h-12 bg-secondary rounded overflow-hidden flex items-center justify-center flex-shrink-0">
-                      <Video className="h-5 w-5 text-muted-foreground/30" />
-                    </div>
-                    <div className="flex-1 text-left">
-                      <p className="text-sm font-medium truncate">{camera.name}</p>
-                      <p className="text-xs text-muted-foreground truncate">{camera.location}</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className={cn(
-                        "w-2 h-2 rounded-full",
-                        statusColors[camera.status]
-                      )} />
-                      <span className="text-xs text-muted-foreground capitalize">{camera.status}</span>
-                    </div>
-                  </button>
-                ))}
-              </div>
+              <>
+                {viewMode === 'grid' ? (
+                  <div className="grid grid-cols-2 gap-3">
+                    {filteredCameras.map((camera) => (
+                      <CameraPreview
+                        key={camera.id}
+                        camera={camera}
+                        onClick={() => setSelectedCamera(camera)}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {filteredCameras.map((camera) => (
+                      <button
+                        key={camera.id}
+                        onClick={() => setSelectedCamera(camera)}
+                        className="w-full flex items-center gap-3 p-3 bg-card hover:bg-secondary/50 border border-border rounded-lg transition-colors"
+                      >
+                        <div className="w-20 h-12 bg-secondary rounded overflow-hidden flex items-center justify-center flex-shrink-0">
+                          <Video className="h-5 w-5 text-muted-foreground/30" />
+                        </div>
+                        <div className="flex-1 text-left">
+                          <p className="text-sm font-medium truncate">{camera.name}</p>
+                          <p className="text-xs text-muted-foreground truncate">{camera.location}</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className={cn('w-2 h-2 rounded-full', statusColors[camera.status])} />
+                          <span className="text-xs text-muted-foreground capitalize">{camera.status}</span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}

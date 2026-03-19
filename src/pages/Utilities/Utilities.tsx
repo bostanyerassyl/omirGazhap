@@ -21,6 +21,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { StatusMessage } from "@/components/ui/status-message"
 import { UtilitiesNav } from "@/components/utilities/utilities-nav"
 import { ResourceChart } from "@/components/utilities/resource-chart"
 import { ScopeSelector } from "@/components/utilities/scope-selector"
@@ -41,7 +42,7 @@ export default function UtilitiesPage() {
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [reportSent, setReportSent] = useState(false)
   const { logout } = useAuth()
-  const { data } = useDashboardData("utilities")
+  const { data, error, reloadData } = useDashboardData("utilities")
   const navigate = useNavigate()
 
   const chartIcons = {
@@ -165,6 +166,14 @@ export default function UtilitiesPage() {
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-6 space-y-6">
+        {error ? (
+          <StatusMessage tone="error" className="flex items-center justify-between gap-3">
+            <span>{error}</span>
+            <Button variant="outline" size="sm" onClick={() => void reloadData()}>
+              Retry
+            </Button>
+          </StatusMessage>
+        ) : null}
         {activeTab === "events" ? (
           /* Events Tab */
           <AIEventsPanel />

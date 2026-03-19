@@ -4,8 +4,6 @@ import { logger } from '@/services/logger'
 import { toError } from '@/utils/error'
 import { supabase } from '../supabaseClient'
 
-const AUTH_SNAPSHOT_KEY = 'auth.snapshot'
-
 export type SignUpPayload = {
   email: string
   password: string
@@ -18,33 +16,21 @@ export type SignInPayload = {
   password: string
 }
 
-function canUseStorage() {
-  return typeof window !== 'undefined'
-}
-
-function persistSnapshot(user: User | null, role: Role | null) {
-  if (!canUseStorage()) {
-    return
+function serializeSignUpRole(role: SignUpPayload['role']) {
+  if (role === 'user') {
+    return 'resident'
   }
 
-  if (!user || !role) {
-    window.localStorage.removeItem(AUTH_SNAPSHOT_KEY)
-    return
-  }
-
-  window.localStorage.setItem(
-    AUTH_SNAPSHOT_KEY,
-    JSON.stringify({
-      userId: user.id,
-      role,
-    }),
-  )
+  return role
 }
 
-function toSessionData(session: Session | null): AuthSessionData {
+function toSessionData(
+  session: Session | null,
+  userOverride?: User | null,
+): AuthSessionData {
   return {
     session,
-    user: session?.user ?? null,
+    user: userOverride ?? session?.user ?? null,
   }
 }
 
@@ -71,7 +57,7 @@ export async function signUp({
       options: {
         data: {
           full_name: fullName,
-          role,
+          role: serializeSignUpRole(role),
         },
       },
     })
@@ -84,7 +70,7 @@ export async function signUp({
     }
 
     return {
-      data: toSessionData(data.session),
+      data: toSessionData(data.session, data.user),
       error: null,
     }
   } catch (error) {
@@ -110,7 +96,7 @@ export async function signIn({
     }
 
     return {
-      data: toSessionData(data.session),
+      data: toSessionData(data.session, data.user),
       error: null,
     }
   } catch (error) {
@@ -129,14 +115,32 @@ export async function signOut(): Promise<AuthResult<null>> {
       }
     }
 
-    persistSnapshot(null, null)
-
     return {
       data: null,
       error: null,
     }
   } catch (error) {
     return toAuthError<null>(error, 'auth.signOut')
+  }
+}
+
+export async function updateAuthEmail(email: string): Promise<AuthResult<User>> {
+  try {
+    const { data, error } = await supabase.auth.updateUser({ email })
+
+    if (error) {
+      return {
+        data: null,
+        error,
+      }
+    }
+
+    return {
+      data: data.user,
+      error: null,
+    }
+  } catch (error) {
+    return toAuthError<User>(error, 'auth.updateEmail')
   }
 }
 
@@ -152,7 +156,7 @@ export async function restoreSession(): Promise<AuthResult<AuthSessionData>> {
     }
 
     return {
-      data: toSessionData(data.session),
+      data: toSessionData(data.session, data.session?.user ?? null),
       error: null,
     }
   } catch (error) {
@@ -166,13 +170,9 @@ export function subscribeToAuthChanges(
   const {
     data: { subscription },
   } = supabase.auth.onAuthStateChange((event, session) => {
-    onChange(toSessionData(session), event)
+    onChange(toSessionData(session, session?.user ?? null), event)
   })
 
   return subscription
-}
-
-export function persistAuthSnapshot(user: User | null, role: Role | null) {
-  persistSnapshot(user, role)
 }
 

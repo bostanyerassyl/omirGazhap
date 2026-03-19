@@ -1,166 +1,60 @@
-import { useState } from "react"
-import { 
-  Building2, 
+import { useState } from 'react'
+import {
+  Building2,
   Phone,
   Mail,
   MapPin,
   Calendar,
   User,
   FileText,
-  ExternalLink,
   Search,
   ChevronRight,
-  Clock,
-  CheckCircle,
-  AlertTriangle,
-  MessageSquare
-} from "lucide-react"
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
-import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
-import { Progress } from "@/components/ui/progress"
-import { cn } from "@/utils/cn"
-
-interface Facility {
-  id: string
-  name: string
-  developer: string
-  developerContact: {
-    phone: string
-    email: string
-  }
-  address: string
-  type: "residential" | "commercial" | "industrial" | "public"
-  status: "planning" | "in-progress" | "completed" | "delayed"
-  progress: number
-  deadline: string
-  startDate: string
-  details: string
-  inclusivity: string[]
-  smartTech: string[]
-  reports: number
-  lastUpdate: string
-}
-
-const facilities: Facility[] = [
-  {
-    id: "1",
-    name: "Alatau Residential Complex",
-    developer: "KazBuild Ltd",
-    developerContact: { phone: "+7 727 123 4567", email: "info@kazbuild.kz" },
-    address: "Abay St, 45",
-    type: "residential",
-    status: "in-progress",
-    progress: 68,
-    deadline: "2024-09-30",
-    startDate: "2023-01-15",
-    details: "12-story residential complex with 240 apartments, underground parking, and commercial space on ground floor.",
-    inclusivity: ["Wheelchair ramps", "Elevators", "Disabled parking"],
-    smartTech: ["Smart energy system", "AI security"],
-    reports: 12,
-    lastUpdate: "2024-01-18"
-  },
-  {
-    id: "2",
-    name: "Business Center Prime",
-    developer: "Capital Invest Group",
-    developerContact: { phone: "+7 727 234 5678", email: "contact@capitalinvest.kz" },
-    address: "Dostyk St, 78",
-    type: "commercial",
-    status: "in-progress",
-    progress: 45,
-    deadline: "2024-12-15",
-    startDate: "2023-06-01",
-    details: "Class A office building with 20 floors, conference center, and rooftop restaurant.",
-    inclusivity: ["Wheelchair ramps", "Elevators", "Tactile paths"],
-    smartTech: ["Smart HVAC", "Automated parking", "Energy management"],
-    reports: 8,
-    lastUpdate: "2024-01-17"
-  },
-  {
-    id: "3",
-    name: "Green Park Development",
-    developer: "EcoBuild KZ",
-    developerContact: { phone: "+7 727 345 6789", email: "eco@ecobuild.kz" },
-    address: "Al-Farabi Ave, 200",
-    type: "public",
-    status: "planning",
-    progress: 15,
-    deadline: "2025-06-01",
-    startDate: "2024-03-01",
-    details: "New public park with smart irrigation, solar-powered lighting, and interactive play areas.",
-    inclusivity: ["Accessible paths", "Sensory garden", "Inclusive playground"],
-    smartTech: ["Smart irrigation", "Solar lighting", "IoT sensors"],
-    reports: 3,
-    lastUpdate: "2024-01-15"
-  },
-  {
-    id: "4",
-    name: "Industrial Zone Expansion",
-    developer: "TechnoIndustrial Corp",
-    developerContact: { phone: "+7 727 456 7890", email: "info@technoindustrial.kz" },
-    address: "Industrial Ave, 1",
-    type: "industrial",
-    status: "delayed",
-    progress: 30,
-    deadline: "2024-06-30",
-    startDate: "2023-03-01",
-    details: "Manufacturing facility expansion with new production lines and warehouse space.",
-    inclusivity: ["Accessible facilities"],
-    smartTech: ["Automated production", "Environmental monitoring"],
-    reports: 15,
-    lastUpdate: "2024-01-18"
-  },
-  {
-    id: "5",
-    name: "Metro Station Almaly",
-    developer: "KazMetro Construction",
-    developerContact: { phone: "+7 727 567 8901", email: "construction@kazmetro.kz" },
-    address: "Almaly District",
-    type: "public",
-    status: "in-progress",
-    progress: 82,
-    deadline: "2024-04-15",
-    startDate: "2022-01-01",
-    details: "New metro station with platform screen doors, escalators, and connection to bus terminal.",
-    inclusivity: ["Full accessibility", "Audio announcements", "Tactile guidance"],
-    smartTech: ["Automatic train control", "Smart ventilation", "Digital signage"],
-    reports: 24,
-    lastUpdate: "2024-01-18"
-  },
-]
+  MessageSquare,
+} from 'lucide-react'
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
+import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
+import { Progress } from '@/components/ui/progress'
+import { cn } from '@/utils/cn'
+import type { AkimatFacility } from '@/types/dashboard'
 
 const typeColors = {
-  residential: "bg-blue-500",
-  commercial: "bg-emerald-500",
-  industrial: "bg-orange-500",
-  public: "bg-purple-500",
+  residential: 'bg-blue-500',
+  commercial: 'bg-emerald-500',
+  industrial: 'bg-orange-500',
+  public: 'bg-purple-500',
 }
 
 const statusConfig = {
-  planning: { color: "text-purple-400", bg: "bg-purple-500/20", label: "Planning" },
-  "in-progress": { color: "text-blue-400", bg: "bg-blue-500/20", label: "In Progress" },
-  completed: { color: "text-green-400", bg: "bg-green-500/20", label: "Completed" },
-  delayed: { color: "text-red-400", bg: "bg-red-500/20", label: "Delayed" },
+  planning: { color: 'text-purple-400', bg: 'bg-purple-500/20', label: 'Planning' },
+  'in-progress': { color: 'text-blue-400', bg: 'bg-blue-500/20', label: 'In Progress' },
+  completed: { color: 'text-green-400', bg: 'bg-green-500/20', label: 'Completed' },
+  delayed: { color: 'text-red-400', bg: 'bg-red-500/20', label: 'Delayed' },
 }
 
-export function FacilitiesPanel() {
-  const [search, setSearch] = useState("")
-  const [selectedFacility, setSelectedFacility] = useState<Facility | null>(null)
-  const [typeFilter, setTypeFilter] = useState<string>("all")
+type FacilitiesPanelProps = {
+  facilities: AkimatFacility[]
+}
 
-  const filteredFacilities = facilities.filter(f => {
-    const matchesSearch = f.name.toLowerCase().includes(search.toLowerCase()) ||
-                          f.developer.toLowerCase().includes(search.toLowerCase()) ||
-                          f.address.toLowerCase().includes(search.toLowerCase())
-    const matchesType = typeFilter === "all" || f.type === typeFilter
+export function FacilitiesPanel({ facilities }: FacilitiesPanelProps) {
+  const [search, setSearch] = useState('')
+  const [selectedFacility, setSelectedFacility] = useState<AkimatFacility | null>(null)
+  const [typeFilter, setTypeFilter] = useState<string>('all')
+
+  const filteredFacilities = facilities.filter((facility) => {
+    const matchesSearch =
+      facility.name.toLowerCase().includes(search.toLowerCase()) ||
+      facility.developer.toLowerCase().includes(search.toLowerCase()) ||
+      facility.address.toLowerCase().includes(search.toLowerCase())
+    const matchesType = typeFilter === 'all' || facility.type === typeFilter
     return matchesSearch && matchesType
   })
 
   const stats = {
     total: facilities.length,
-    inProgress: facilities.filter(f => f.status === "in-progress").length,
-    delayed: facilities.filter(f => f.status === "delayed").length,
+    inProgress: facilities.filter((facility) => facility.status === 'in-progress').length,
+    delayed: facilities.filter((facility) => facility.status === 'delayed').length,
+    completed: facilities.filter((facility) => facility.status === 'completed').length,
   }
 
   return (
@@ -245,10 +139,22 @@ export function FacilitiesPanel() {
                     </a>
                   </div>
                 </div>
-                <Button variant="outline" size="sm" className="w-full mt-3">
+                <Button
+                  asChild
+                  variant="outline"
+                  size="sm"
+                  className="w-full mt-3"
+                >
+                  <a
+                    href={`mailto:${selectedFacility.developerContact.email}?subject=${encodeURIComponent(`Akimat inquiry: ${selectedFacility.name}`)}&body=${encodeURIComponent(`Hello,\n\nI am contacting you from the Akimat dashboard regarding ${selectedFacility.name}.\n\n`)}`}
+                  >
                   <MessageSquare className="h-4 w-4 mr-2" />
                   Contact Developer
+                  </a>
                 </Button>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Facility status is derived from project records and is expected to be updated from the developer side.
+                </p>
               </div>
 
               {/* Details */}
@@ -257,30 +163,6 @@ export function FacilitiesPanel() {
                 <p className="text-sm text-muted-foreground leading-relaxed">
                   {selectedFacility.details}
                 </p>
-              </div>
-
-              {/* Inclusivity */}
-              <div>
-                <h3 className="font-medium mb-2">Accessibility Features</h3>
-                <div className="flex flex-wrap gap-2">
-                  {selectedFacility.inclusivity.map((item, i) => (
-                    <span key={i} className="px-2 py-1 bg-green-500/20 text-green-400 rounded text-xs">
-                      {item}
-                    </span>
-                  ))}
-                </div>
-              </div>
-
-              {/* Smart Tech */}
-              <div>
-                <h3 className="font-medium mb-2">Smart Technologies</h3>
-                <div className="flex flex-wrap gap-2">
-                  {selectedFacility.smartTech.map((item, i) => (
-                    <span key={i} className="px-2 py-1 bg-accent/20 text-accent rounded text-xs">
-                      {item}
-                    </span>
-                  ))}
-                </div>
               </div>
 
               {/* Reports */}
@@ -292,17 +174,16 @@ export function FacilitiesPanel() {
                     <p className="text-xs text-muted-foreground">Last update: {selectedFacility.lastUpdate}</p>
                   </div>
                 </div>
-                <Button variant="outline" size="sm">
-                  <ExternalLink className="h-4 w-4 mr-2" />
-                  View Reports
-                </Button>
+                <span className="text-xs text-muted-foreground">
+                  Reports are synced from cases and observations.
+                </span>
               </div>
             </div>
           </div>
         ) : (
           <div className="p-4 space-y-4 h-[calc(100vh-80px)] overflow-y-auto">
             {/* Stats */}
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-4 gap-2">
               <div className="bg-secondary/50 rounded-lg p-3 text-center">
                 <div className="text-2xl font-bold">{stats.total}</div>
                 <div className="text-xs text-muted-foreground">Total Projects</div>
@@ -314,6 +195,10 @@ export function FacilitiesPanel() {
               <div className="bg-red-500/10 rounded-lg p-3 text-center">
                 <div className="text-2xl font-bold text-red-400">{stats.delayed}</div>
                 <div className="text-xs text-muted-foreground">Delayed</div>
+              </div>
+              <div className="bg-green-500/10 rounded-lg p-3 text-center">
+                <div className="text-2xl font-bold text-green-400">{stats.completed}</div>
+                <div className="text-xs text-muted-foreground">Completed</div>
               </div>
             </div>
 
@@ -330,7 +215,7 @@ export function FacilitiesPanel() {
 
             {/* Type Filters */}
             <div className="flex gap-2 overflow-x-auto pb-2">
-              {["all", "residential", "commercial", "industrial", "public"].map((type) => (
+              {['all', 'residential', 'commercial', 'industrial', 'public'].map((type) => (
                 <button
                   key={type}
                   onClick={() => setTypeFilter(type)}
@@ -346,48 +231,53 @@ export function FacilitiesPanel() {
               ))}
             </div>
 
-            {/* Facilities List */}
-            <div className="space-y-3">
-              {filteredFacilities.map((facility) => (
-                <button
-                  key={facility.id}
-                  onClick={() => setSelectedFacility(facility)}
-                  className="w-full bg-card hover:bg-secondary/50 border border-border rounded-lg p-4 text-left transition-colors"
-                >
-                  <div className="flex items-start justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <span className={cn("w-2 h-2 rounded-full", typeColors[facility.type])} />
-                      <span className="font-medium text-sm">{facility.name}</span>
+            {filteredFacilities.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+                No facilities found. Add non-camera assets and assign locations to populate this panel.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {filteredFacilities.map((facility) => (
+                  <button
+                    key={facility.id}
+                    onClick={() => setSelectedFacility(facility)}
+                    className="w-full bg-card hover:bg-secondary/50 border border-border rounded-lg p-4 text-left transition-colors"
+                  >
+                    <div className="flex items-start justify-between mb-2 gap-3">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className={cn('w-2 h-2 rounded-full shrink-0', typeColors[facility.type])} />
+                        <span className="font-medium text-sm truncate">{facility.name}</span>
+                      </div>
+                      <span className={cn(
+                        'px-2 py-0.5 rounded text-xs shrink-0',
+                        statusConfig[facility.status].bg,
+                        statusConfig[facility.status].color
+                      )}>
+                        {statusConfig[facility.status].label}
+                      </span>
                     </div>
-                    <span className={cn(
-                      "px-2 py-0.5 rounded text-xs",
-                      statusConfig[facility.status].bg,
-                      statusConfig[facility.status].color
-                    )}>
-                      {statusConfig[facility.status].label}
-                    </span>
-                  </div>
-                  
-                  <p className="text-xs text-muted-foreground mb-2">{facility.developer}</p>
-                  
-                  <div className="flex items-center gap-2 mb-3">
-                    <Progress value={facility.progress} className="h-1.5 flex-1" />
-                    <span className="text-xs font-medium">{facility.progress}%</span>
-                  </div>
-                  
-                  <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span className="flex items-center gap-1">
-                      <MapPin className="h-3 w-3" />
-                      {facility.address}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <Calendar className="h-3 w-3" />
-                      {facility.deadline}
-                    </span>
-                  </div>
-                </button>
-              ))}
-            </div>
+
+                    <p className="text-xs text-muted-foreground mb-2">{facility.developer}</p>
+
+                    <div className="flex items-center gap-2 mb-3">
+                      <Progress value={facility.progress} className="h-1.5 flex-1" />
+                      <span className="text-xs font-medium">{facility.progress}%</span>
+                    </div>
+
+                    <div className="flex items-center justify-between text-xs text-muted-foreground gap-3">
+                      <span className="flex items-center gap-1 truncate">
+                        <MapPin className="h-3 w-3 shrink-0" />
+                        {facility.address}
+                      </span>
+                      <span className="flex items-center gap-1 shrink-0">
+                        <Calendar className="h-3 w-3" />
+                        {facility.deadline}
+                      </span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </SheetContent>
