@@ -1,6 +1,6 @@
 import { useState, type ChangeEvent, type FormEvent } from 'react'
 
-export type RegisterRole = 'user' | 'developer'
+export type RegisterRole = 'user' | 'developer' | 'industrialist'
 
 export type RegisterFormData = {
   username: string

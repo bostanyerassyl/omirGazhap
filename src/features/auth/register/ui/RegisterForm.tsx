@@ -12,7 +12,8 @@ function RegisterForm() {
           <p className={styles.eyebrow}>Registration</p>
           <h1 className={styles.title}>Create your account</h1>
           <p className={styles.subtitle}>
-            Register as a user or developer to access the platform.
+            Register as a user, developer, or industrialist to access the
+            platform.
           </p>
         </div>
 
@@ -51,6 +52,7 @@ function RegisterForm() {
             >
               <option value="user">user</option>
               <option value="developer">developer</option>
+              <option value="industrialist">industrialist</option>
             </select>
           </label>
 
