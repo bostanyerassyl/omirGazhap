@@ -28,7 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import type { ConstructionObject } from "./objects-list"
+import type { ConstructionObject } from "@/types/dashboard"
 
 interface ObjectEditorProps {
   object: ConstructionObject

@@ -25,16 +25,20 @@ import { RequestsPanel } from "@/components/akimat/requests-panel"
 import { CamerasPanel } from "@/components/akimat/cameras-panel"
 import { FacilitiesPanel } from "@/components/akimat/facilities-panel"
 import { StatisticsPanel } from "@/components/akimat/statistics-panel"
+import { useAuth } from "@/features/auth/model/AuthProvider"
+import { useDashboardData } from "@/features/dashboard/model/useDashboardData"
 
 export default function AkimatDashboard() {
   const [notifications] = useState(5)
+  const { logout } = useAuth()
+  const { data } = useDashboardData("akimat")
 
-  const quickStats = [
-    { label: "Active Projects", value: "156", icon: Building2, color: "text-accent" },
-    { label: "Open Issues", value: "23", icon: AlertTriangle, color: "text-amber-400" },
-    { label: "Cameras Online", value: "89%", icon: Camera, color: "text-green-400" },
-    { label: "Pending Requests", value: "45", icon: BarChart3, color: "text-blue-400" },
-  ]
+  const iconMap = {
+    building: Building2,
+    alert: AlertTriangle,
+    camera: Camera,
+    chart: BarChart3,
+  } as const
 
   return (
     <div className="min-h-screen bg-background">
@@ -70,7 +74,7 @@ export default function AkimatDashboard() {
                 <span>Settings</span>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem className="text-red-400">
+              <DropdownMenuItem className="text-red-400" onClick={() => void logout()}>
                 <LogOut className="mr-2 h-4 w-4" />
                 <span>Log out</span>
               </DropdownMenuItem>
@@ -119,8 +123,8 @@ export default function AkimatDashboard() {
       <main className="container mx-auto px-4 py-6">
         {/* Quick Stats */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          {quickStats.map((stat) => {
-            const Icon = stat.icon
+          {(data?.quickStats ?? []).map((stat) => {
+            const Icon = iconMap[stat.icon]
             return (
               <Card key={stat.label} className="bg-card border-border">
                 <CardContent className="p-4 flex items-center gap-4">
@@ -168,15 +172,8 @@ export default function AkimatDashboard() {
               <CardTitle className="text-lg">Recent Activity</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3 max-h-[350px] overflow-y-auto">
-              {[
-                { type: "request", text: "New complaint from Central District", time: "5 min ago", icon: AlertTriangle, color: "text-amber-400" },
-                { type: "camera", text: "Camera #45 back online", time: "12 min ago", icon: Camera, color: "text-green-400" },
-                { type: "facility", text: "New report from ABC Construction", time: "25 min ago", icon: Building2, color: "text-blue-400" },
-                { type: "stats", text: "Water consumption spike detected", time: "1 hour ago", icon: BarChart3, color: "text-cyan-400" },
-                { type: "request", text: "Suggestion approved for review", time: "2 hours ago", icon: AlertTriangle, color: "text-green-400" },
-                { type: "camera", text: "Camera #12 maintenance scheduled", time: "3 hours ago", icon: Camera, color: "text-amber-400" },
-              ].map((activity, i) => {
-                const Icon = activity.icon
+              {(data?.recentActivity ?? []).map((activity, i) => {
+                const Icon = iconMap[activity.icon]
                 return (
                   <div key={i} className="flex items-start gap-3 p-2 rounded-lg hover:bg-secondary/50 transition-colors">
                     <div className={`p-1.5 rounded bg-secondary ${activity.color}`}>

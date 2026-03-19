@@ -1,16 +1,20 @@
 import { useState } from "react"
 import { Send, CheckCircle2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { ObjectsList, mockObjects, type ConstructionObject } from "@/components/developer/objects-list"
+import { ObjectsList } from "@/components/developer/objects-list"
 import { ObjectEditor } from "@/components/developer/object-editor"
 import { DeveloperMap } from "@/components/developer/developer-map"
 import { DeveloperProfile } from "@/components/developer/developer-profile"
+import { useDashboardData } from "@/features/dashboard/model/useDashboardData"
+import type { ConstructionObject } from "@/types/dashboard"
 
 export default function DeveloperDashboard() {
+  const { data, loading, updateDeveloperObject } = useDashboardData("developer")
   const [selectedObject, setSelectedObject] = useState<ConstructionObject | undefined>()
   const [isEditorOpen, setIsEditorOpen] = useState(false)
-  const [objects, setObjects] = useState(mockObjects)
   const [reportSent, setReportSent] = useState(false)
+
+  const objects = data?.objects ?? []
 
   const handleSelectObject = (obj: ConstructionObject) => {
     setSelectedObject(obj)
@@ -18,7 +22,8 @@ export default function DeveloperDashboard() {
   }
 
   const handleSaveObject = (updatedObj: ConstructionObject) => {
-    setObjects(prev => prev.map(o => o.id === updatedObj.id ? updatedObj : o))
+    updateDeveloperObject(updatedObj)
+    setSelectedObject(updatedObj)
     setIsEditorOpen(false)
   }
 
@@ -34,6 +39,7 @@ export default function DeveloperDashboard() {
 
   return (
     <div className="h-screen w-full relative overflow-hidden bg-background">
+      {loading ? <div /> : null}
       {/* Map */}
       <DeveloperMap 
         objects={objects}
@@ -48,6 +54,7 @@ export default function DeveloperDashboard() {
           <div className="flex items-center gap-3">
             <DeveloperProfile />
             <ObjectsList 
+              objects={objects}
               onSelectObject={handleSelectObject}
               selectedObjectId={selectedObject?.id}
             />

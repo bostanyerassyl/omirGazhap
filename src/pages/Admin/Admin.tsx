@@ -45,175 +45,16 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
+import { useAuth } from "@/features/auth/model/AuthProvider"
+import { adminReviewSchema } from "@/features/admin/model/admin.schema"
+import { useDashboardData } from "@/features/dashboard/model/useDashboardData"
 import { cn } from "@/utils/cn"
-
-// Mock data for feature requests
-const featureRequests = [
-  {
-    id: "1",
-    type: "feature",
-    title: "Add dark mode toggle in settings",
-    description: "It would be great to have a manual toggle for dark/light mode in the user settings instead of only system preference.",
-    submittedBy: "Amir Nurgaliyev",
-    role: "resident",
-    email: "amir@mail.kz",
-    date: "2024-01-15",
-    status: "pending",
-    priority: "medium"
-  },
-  {
-    id: "2",
-    type: "bug",
-    title: "Map markers not loading on mobile",
-    description: "When using the app on iPhone Safari, sometimes the map markers don't appear until you zoom in and out.",
-    submittedBy: "KazBuild LLC",
-    role: "developer",
-    email: "support@kazbuild.kz",
-    date: "2024-01-14",
-    status: "in-review",
-    priority: "high"
-  },
-  {
-    id: "3",
-    type: "improvement",
-    title: "Better statistics export options",
-    description: "Please add PDF and Excel export for the statistics dashboard. Currently only JSON is supported.",
-    submittedBy: "Alatau Energy",
-    role: "public-utilities",
-    email: "admin@alatau-energy.kz",
-    date: "2024-01-13",
-    status: "approved",
-    priority: "low"
-  },
-  {
-    id: "4",
-    type: "feature",
-    title: "Real-time notifications for emissions alerts",
-    description: "We need push notifications when our emissions approach the threshold limits so we can take action proactively.",
-    submittedBy: "Steel Works Alatau",
-    role: "industrialist",
-    email: "env@steelworks.kz",
-    date: "2024-01-12",
-    status: "pending",
-    priority: "high"
-  },
-  {
-    id: "5",
-    type: "improvement",
-    title: "Integrate with national ID system",
-    description: "Allow users to verify their identity using the national eGov ID system for faster registration.",
-    submittedBy: "Akimat Department",
-    role: "akimat",
-    email: "it@akimat.gov.kz",
-    date: "2024-01-11",
-    status: "pending",
-    priority: "medium"
-  }
-]
-
-// Mock data for location confirmations
-const locationRequests = [
-  {
-    id: "1",
-    type: "place",
-    name: "New Coffee Shop - Baristar",
-    address: "Abay Avenue 45, Central District",
-    submittedBy: "Daulet Kasymov",
-    role: "resident",
-    date: "2024-01-15",
-    coordinates: { lat: 43.238, lng: 76.945 },
-    photos: 3,
-    status: "pending"
-  },
-  {
-    id: "2",
-    type: "ramp",
-    name: "Wheelchair Ramp at Mall Entrance",
-    address: "Dostyk Plaza, Main Entrance",
-    submittedBy: "Accessibility Initiative",
-    role: "resident",
-    date: "2024-01-14",
-    coordinates: { lat: 43.241, lng: 76.951 },
-    photos: 2,
-    status: "pending"
-  },
-  {
-    id: "3",
-    type: "event",
-    name: "Weekly Farmers Market",
-    address: "Green Park, Northern District",
-    submittedBy: "Local Farmers Association",
-    role: "resident",
-    date: "2024-01-13",
-    coordinates: { lat: 43.235, lng: 76.938 },
-    photos: 5,
-    status: "approved"
-  },
-  {
-    id: "4",
-    type: "hazard",
-    name: "Road Pothole - Dangerous",
-    address: "Satpayev Street 78",
-    submittedBy: "Anonymous User",
-    role: "resident",
-    date: "2024-01-12",
-    coordinates: { lat: 43.229, lng: 76.942 },
-    photos: 1,
-    status: "pending"
-  }
-]
-
-// Mock data for role confirmations
-const roleRequests = [
-  {
-    id: "1",
-    username: "kazbuild_admin",
-    fullName: "Nurlan Seitov",
-    email: "nurlan@kazbuild.kz",
-    requestedRole: "developer",
-    currentRole: "resident",
-    company: "KazBuild Construction LLC",
-    documents: ["Business License", "Construction Permit"],
-    date: "2024-01-15",
-    status: "pending"
-  },
-  {
-    id: "2",
-    username: "alatau_power",
-    fullName: "Saule Nurbekova",
-    email: "saule@alatau-power.kz",
-    requestedRole: "public-utilities",
-    currentRole: "resident",
-    company: "Alatau Power Grid",
-    documents: ["Company Certificate", "Authorization Letter"],
-    date: "2024-01-14",
-    status: "pending"
-  },
-  {
-    id: "3",
-    username: "metalworks_env",
-    fullName: "Bekzat Omarov",
-    email: "bekzat@metalworks.kz",
-    requestedRole: "industrialist",
-    currentRole: "resident",
-    company: "Alatau Metalworks JSC",
-    documents: ["Industrial License", "Environmental Permit"],
-    date: "2024-01-13",
-    status: "in-review"
-  },
-  {
-    id: "4",
-    username: "city_planning",
-    fullName: "Aliya Kenzhebekova",
-    email: "aliya@akimat.gov.kz",
-    requestedRole: "akimat",
-    currentRole: "resident",
-    company: "Alatau City Planning Department",
-    documents: ["Government ID", "Department Authorization"],
-    date: "2024-01-12",
-    status: "pending"
-  }
-]
+import type {
+  AdminReviewTarget,
+  FeatureRequest,
+  LocationRequest,
+  RoleRequest,
+} from "@/types/dashboard"
 
 const typeIcons: Record<string, typeof Lightbulb> = {
   feature: Sparkles,
@@ -234,12 +75,19 @@ const roleIcons: Record<string, typeof User> = {
 }
 
 export default function AdminDashboard() {
+  const { logout } = useAuth()
+  const { data, reviewAdminItem } = useDashboardData("admin")
   const [activeTab, setActiveTab] = useState("requests")
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
-  const [selectedItem, setSelectedItem] = useState<typeof featureRequests[0] | typeof locationRequests[0] | typeof roleRequests[0] | null>(null)
-  const [dialogType, setDialogType] = useState<"request" | "location" | "role" | null>(null)
+  const [selectedItem, setSelectedItem] = useState<FeatureRequest | LocationRequest | RoleRequest | null>(null)
+  const [dialogType, setDialogType] = useState<AdminReviewTarget | null>(null)
   const [adminNote, setAdminNote] = useState("")
+  const [adminNoteError, setAdminNoteError] = useState<string | null>(null)
+
+  const featureRequests = data?.featureRequests ?? []
+  const locationRequests = data?.locationRequests ?? []
+  const roleRequests = data?.roleRequests ?? []
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -275,17 +123,32 @@ export default function AdminDashboard() {
     totalUsers: 15234
   }
 
-  const openDialog = (item: typeof featureRequests[0] | typeof locationRequests[0] | typeof roleRequests[0], type: "request" | "location" | "role") => {
+  const openDialog = (item: FeatureRequest | LocationRequest | RoleRequest, type: AdminReviewTarget) => {
     setSelectedItem(item)
     setDialogType(type)
     setAdminNote("")
+    setAdminNoteError(null)
   }
 
   const handleAction = (action: "approve" | "reject") => {
-    // In a real app, this would update the database
-    console.log(`${action} item:`, selectedItem, "Note:", adminNote)
+    const validationResult = adminReviewSchema.safeParse({
+      note: adminNote || undefined,
+    })
+
+    if (!validationResult.success) {
+      setAdminNoteError(validationResult.error.flatten().fieldErrors.note?.[0] ?? null)
+      return
+    }
+
+    if (!selectedItem || !dialogType) {
+      return
+    }
+
+    reviewAdminItem(dialogType, selectedItem.id, action)
     setSelectedItem(null)
     setDialogType(null)
+    setAdminNote("")
+    setAdminNoteError(null)
   }
 
   return (
@@ -322,7 +185,7 @@ export default function AdminDashboard() {
                 <span>System Settings</span>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem className="text-red-400">
+              <DropdownMenuItem className="text-red-400" onClick={() => void logout()}>
                 <LogOut className="mr-2 h-4 w-4" />
                 <span>Log out</span>
               </DropdownMenuItem>
@@ -684,9 +547,15 @@ export default function AdminDashboard() {
                 <Textarea
                   placeholder="Add a note for the user..."
                   value={adminNote}
-                  onChange={(e) => setAdminNote(e.target.value)}
+                  onChange={(e) => {
+                    setAdminNote(e.target.value)
+                    setAdminNoteError(null)
+                  }}
                   className="bg-secondary/50"
                 />
+                {adminNoteError ? (
+                  <p className="mt-2 text-sm text-red-300">{adminNoteError}</p>
+                ) : null}
               </div>
             </div>
           )}

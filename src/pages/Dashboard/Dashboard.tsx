@@ -7,6 +7,7 @@ import { RouteSearch } from "@/components/dashboard/route-search"
 import { MapFilters } from "@/components/dashboard/map-filters"
 import { Calendar } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { useDashboardData } from "@/features/dashboard/model/useDashboardData"
 import {
   Sheet,
   SheetContent,
@@ -25,14 +26,7 @@ interface FilterState {
 }
 
 // Events Sheet Component
-function EventsSheet() {
-  const events = [
-    { id: "1", title: "Alatau City Festival", date: "March 25, 2026", time: "14:00", location: "Central Park" },
-    { id: "2", title: "Smart City Marathon", date: "April 5, 2026", time: "08:00", location: "City Center" },
-    { id: "3", title: "Tech Expo 2026", date: "April 10, 2026", time: "10:00", location: "Convention Center" },
-    { id: "4", title: "Community Meetup", date: "March 28, 2026", time: "18:00", location: "District 7 Hall" },
-  ]
-
+function EventsSheet({ events }: { events: Array<{ id: string; title: string; date: string; time: string; location: string }> }) {
   return (
     <Sheet>
       <SheetTrigger asChild>
@@ -72,6 +66,7 @@ function EventsSheet() {
 }
 
 export default function DashboardPage() {
+  const { data } = useDashboardData("dashboard")
   const [filters, setFilters] = useState<FilterState>({
     ramps: true,
     scooters: true,
@@ -108,7 +103,7 @@ export default function DashboardPage() {
         {/* Right - Action buttons */}
         <div className="flex items-center gap-1">
           <MessagesPanel />
-          <EventsSheet />
+          <EventsSheet events={data?.events ?? []} />
           <AddContentDialog />
         </div>
       </header>

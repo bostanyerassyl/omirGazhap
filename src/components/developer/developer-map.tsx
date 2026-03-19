@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { Building2, CheckCircle2, Clock, AlertCircle } from "lucide-react"
-import type { ConstructionObject } from "./objects-list"
+import type { ConstructionObject } from "@/types/dashboard"
 
 interface DeveloperMapProps {
   objects: ConstructionObject[]

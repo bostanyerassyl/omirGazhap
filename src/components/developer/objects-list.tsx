@@ -13,6 +13,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import type { ConstructionObject } from "@/types/dashboard"
 import {
   Sheet,
   SheetContent,
@@ -20,64 +21,6 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet"
-
-interface ConstructionObject {
-  id: string
-  name: string
-  address: string
-  status: "planning" | "in-progress" | "completed" | "delayed"
-  deadline: string
-  progress: number
-  coordinates: { lat: number; lng: number }
-}
-
-const mockObjects: ConstructionObject[] = [
-  {
-    id: "1",
-    name: "Alatau Business Center",
-    address: "123 Central Avenue",
-    status: "in-progress",
-    deadline: "2026-12-15",
-    progress: 65,
-    coordinates: { lat: 43.238, lng: 76.945 }
-  },
-  {
-    id: "2",
-    name: "Green Park Residence",
-    address: "45 Park Street",
-    status: "planning",
-    deadline: "2027-06-01",
-    progress: 15,
-    coordinates: { lat: 43.242, lng: 76.952 }
-  },
-  {
-    id: "3",
-    name: "Smart Living Complex",
-    address: "78 Innovation Boulevard",
-    status: "in-progress",
-    deadline: "2026-09-30",
-    progress: 82,
-    coordinates: { lat: 43.235, lng: 76.938 }
-  },
-  {
-    id: "4",
-    name: "Eco Mall Alatau",
-    address: "200 Commerce Drive",
-    status: "delayed",
-    deadline: "2026-08-01",
-    progress: 45,
-    coordinates: { lat: 43.248, lng: 76.960 }
-  },
-  {
-    id: "5",
-    name: "Tech Hub Tower",
-    address: "15 Digital Street",
-    status: "completed",
-    deadline: "2025-12-01",
-    progress: 100,
-    coordinates: { lat: 43.230, lng: 76.942 }
-  },
-]
 
 const statusConfig = {
   "planning": { label: "Planning", color: "bg-blue-500/20 text-blue-400 border-blue-500/30", icon: Clock },
@@ -87,15 +30,20 @@ const statusConfig = {
 }
 
 interface ObjectsListProps {
+  objects: ConstructionObject[]
   onSelectObject: (obj: ConstructionObject) => void
   selectedObjectId?: string
 }
 
-export function ObjectsList({ onSelectObject, selectedObjectId }: ObjectsListProps) {
+export function ObjectsList({
+  objects,
+  onSelectObject,
+  selectedObjectId,
+}: ObjectsListProps) {
   const [searchQuery, setSearchQuery] = useState("")
   const [isOpen, setIsOpen] = useState(false)
 
-  const filteredObjects = mockObjects.filter(obj =>
+  const filteredObjects = objects.filter(obj =>
     obj.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     obj.address.toLowerCase().includes(searchQuery.toLowerCase())
   )
@@ -199,7 +147,4 @@ export function ObjectsList({ onSelectObject, selectedObjectId }: ObjectsListPro
     </Sheet>
   )
 }
-
-export { mockObjects }
-export type { ConstructionObject }
 

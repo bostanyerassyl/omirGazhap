@@ -27,13 +27,10 @@ import { ScopeSelector } from "@/components/utilities/scope-selector"
 import { StatsCards } from "@/components/utilities/stats-cards"
 import { AIEventsPanel } from "@/components/utilities/ai-events-panel"
 import { UtilitiesMap } from "@/components/utilities/utilities-map"
+import { useAuth } from "@/features/auth/model/AuthProvider"
+import { useDashboardData } from "@/features/dashboard/model/useDashboardData"
 import { cn } from "@/utils/cn"
-
-const chartTypes = [
-  { id: "area", icon: AreaChartIcon, label: "Area" },
-  { id: "bar", icon: BarChart3, label: "Bar" },
-  { id: "line", icon: LineChart, label: "Line" },
-] as const
+import { useNavigate } from "react-router-dom"
 
 export default function UtilitiesPage() {
   const [activeTab, setActiveTab] = useState("electricity")
@@ -43,6 +40,15 @@ export default function UtilitiesPage() {
   const [chartType, setChartType] = useState<"area" | "bar" | "line">("area")
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [reportSent, setReportSent] = useState(false)
+  const { logout } = useAuth()
+  const { data } = useDashboardData("utilities")
+  const navigate = useNavigate()
+
+  const chartIcons = {
+    area: AreaChartIcon,
+    bar: BarChart3,
+    line: LineChart,
+  } as const
 
   const handleScopeChange = (newScope: string, newDistrict: string | null, newBuilding: string | null) => {
     setScope(newScope)
@@ -66,6 +72,11 @@ export default function UtilitiesPage() {
     setReportSent(true)
     await new Promise(resolve => setTimeout(resolve, 2000))
     setReportSent(false)
+  }
+
+  const handleLogout = async () => {
+    await logout()
+    navigate("/login", { replace: true })
   }
 
   return (
@@ -99,7 +110,7 @@ export default function UtilitiesPage() {
                   System Settings
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem className="text-red-400">
+                <DropdownMenuItem className="text-red-400" onClick={() => void handleLogout()}>
                   <LogOut className="w-4 h-4 mr-2" />
                   Sign Out
                 </DropdownMenuItem>
@@ -171,8 +182,8 @@ export default function UtilitiesPage() {
 
               {/* Chart Type Selector */}
               <div className="flex items-center gap-1 p-1 bg-secondary/50 rounded-lg">
-                {chartTypes.map((type) => {
-                  const Icon = type.icon
+                {(data?.chartTypes ?? []).map((type) => {
+                  const Icon = chartIcons[type.id]
                   return (
                     <Button
                       key={type.id}

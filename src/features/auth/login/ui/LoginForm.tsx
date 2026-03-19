@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { ArrowRight, Eye, EyeOff, Lock, User } from 'lucide-react'
 import { AuthLayout } from '@/components/auth/auth-layout'
 import { Button } from '@/components/ui/button'
@@ -12,9 +12,13 @@ import {
 import useLoginForm from '../model/useLoginForm'
 
 function LoginForm() {
-  const { formData, handleSubmit, handleFieldChange } = useLoginForm()
+  const { formData, fieldErrors, submitError, handleSubmit, handleFieldChange } =
+    useLoginForm()
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const location = useLocation()
+  const successMessage =
+    typeof location.state?.message === 'string' ? location.state.message : null
 
   const onSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     setIsLoading(true)
@@ -31,6 +35,16 @@ function LoginForm() {
       subtitle="Enter your credentials to access your account"
     >
       <form onSubmit={onSubmit} className="space-y-6">
+        {successMessage ? (
+          <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">
+            {successMessage}
+          </div>
+        ) : null}
+        {submitError ? (
+          <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+            {submitError}
+          </div>
+        ) : null}
         <FieldGroup>
           <Field>
             <FieldLabel htmlFor="email">Email</FieldLabel>
@@ -49,6 +63,9 @@ function LoginForm() {
                 autoComplete="email"
               />
             </InputGroup>
+            {fieldErrors.email ? (
+              <p className="mt-2 text-sm text-red-300">{fieldErrors.email}</p>
+            ) : null}
           </Field>
 
           <Field>
@@ -82,6 +99,9 @@ function LoginForm() {
                 </button>
               </InputGroupAddon>
             </InputGroup>
+            {fieldErrors.password ? (
+              <p className="mt-2 text-sm text-red-300">{fieldErrors.password}</p>
+            ) : null}
           </Field>
         </FieldGroup>
 

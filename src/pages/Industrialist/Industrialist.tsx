@@ -18,20 +18,21 @@ import { IndustrialistNav } from "@/components/industrialist/industrialist-nav"
 import { EmissionsSection } from "@/components/industrialist/emissions-section"
 import { ProductionSection } from "@/components/industrialist/production-section"
 import { FinancesSection } from "@/components/industrialist/finances-section"
-import { useNavigate } from "react-router-dom"
+import { useAuth } from "@/features/auth/model/AuthProvider"
+import { useDashboardData } from "@/features/dashboard/model/useDashboardData"
 
 export default function IndustrialistDashboard() {
   const [activeTab, setActiveTab] = useState("emissions")
-  const navigate = useNavigate()
-
-  const companyInfo = {
-    name: "Alatau Steel Works",
+  const { logout } = useAuth()
+  const { data } = useDashboardData("industrialist")
+  const companyInfo = data?.companyInfo ?? {
+    name: "Industrial Account",
     avatar: "",
-    notifications: 3,
+    notifications: 0,
   }
 
-  const handleLogout = () => {
-    navigate("/login")
+  const handleLogout = async () => {
+    await logout()
   }
 
   return (

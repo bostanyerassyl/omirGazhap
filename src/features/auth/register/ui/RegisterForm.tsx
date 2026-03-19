@@ -19,7 +19,14 @@ import {
 } from '@/components/ui/select'
 
 function RegisterForm() {
-  const { formData, handleSubmit, handleFieldChange } = useRegisterForm()
+  const {
+    formData,
+    fieldErrors,
+    submitError,
+    submitSuccess,
+    handleSubmit,
+    handleFieldChange,
+  } = useRegisterForm()
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
 
@@ -38,6 +45,16 @@ function RegisterForm() {
       subtitle="Join the Alatau Smart City community"
     >
       <form onSubmit={onSubmit} className="space-y-6">
+        {submitError ? (
+          <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+            {submitError}
+          </div>
+        ) : null}
+        {submitSuccess ? (
+          <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">
+            {submitSuccess}
+          </div>
+        ) : null}
         <FieldGroup>
           <Field>
             <FieldLabel htmlFor="fullName">Full name</FieldLabel>
@@ -56,6 +73,9 @@ function RegisterForm() {
                 autoComplete="name"
               />
             </InputGroup>
+            {fieldErrors.fullName ? (
+              <p className="mt-2 text-sm text-red-300">{fieldErrors.fullName}</p>
+            ) : null}
           </Field>
 
           <Field>
@@ -75,6 +95,9 @@ function RegisterForm() {
                 autoComplete="email"
               />
             </InputGroup>
+            {fieldErrors.email ? (
+              <p className="mt-2 text-sm text-red-300">{fieldErrors.email}</p>
+            ) : null}
           </Field>
 
           <Field>
@@ -108,6 +131,9 @@ function RegisterForm() {
                 </button>
               </InputGroupAddon>
             </InputGroup>
+            {fieldErrors.password ? (
+              <p className="mt-2 text-sm text-red-300">{fieldErrors.password}</p>
+            ) : null}
           </Field>
 
           <Field>
@@ -137,6 +163,9 @@ function RegisterForm() {
                 </SelectContent>
               </Select>
             </div>
+            {fieldErrors.role ? (
+              <p className="mt-2 text-sm text-red-300">{fieldErrors.role}</p>
+            ) : null}
           </Field>
         </FieldGroup>
 

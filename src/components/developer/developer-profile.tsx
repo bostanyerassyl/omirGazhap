@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { FieldGroup, Field, FieldLabel } from "@/components/ui/field"
+import { useAuth } from "@/features/auth/model/AuthProvider"
 import {
   Sheet,
   SheetContent,
@@ -26,6 +27,7 @@ import {
 export function DeveloperProfile() {
   const [isEditing, setIsEditing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  const { logout } = useAuth()
   const [profile, setProfile] = useState({
     name: "Alatau Development Corp",
     email: "contact@alataudev.kz",
@@ -229,6 +231,7 @@ export function DeveloperProfile() {
           <Button
             variant="outline"
             className="w-full border-red-500/30 text-red-400 hover:bg-red-500/10 hover:text-red-300"
+            onClick={() => void logout()}
           >
             <LogOut className="h-4 w-4 mr-2" />
             Sign Out
