@@ -248,6 +248,124 @@ export type IndustrialistCompanyInfo = {
   notifications: number
 }
 
+export type IndustrialistMetricCard = {
+  label: string
+  value: string
+  change: number
+  subtext: string
+}
+
+export type IndustrialistMonthlyEmissionPoint = {
+  month: string
+  co2: number
+  nox: number
+  so2: number
+  particles: number
+}
+
+export type IndustrialistBreakdownItem = {
+  name: string
+  value: number
+  color: string
+}
+
+export type IndustrialistIncident = {
+  id: string
+  type: 'leak' | 'excess' | 'violation' | 'accident'
+  title: string
+  date: string
+  severity: 'low' | 'medium' | 'high' | 'critical'
+  consequence: string
+  solution: string
+  status: 'pending' | 'in-progress' | 'resolved'
+  reportedToAkimat: boolean
+  assetId: string | null
+}
+
+export type IndustrialistProductionPoint = {
+  month: string
+  actual: number
+  target: number
+  efficiency: number
+}
+
+export type IndustrialistProductLine = {
+  id: string
+  name: string
+  units: number
+  target: number
+  efficiency: number
+  status: 'on-track' | 'exceeding' | 'behind'
+}
+
+export type IndustrialistWeeklyShiftPoint = {
+  day: string
+  shift1: number
+  shift2: number
+  shift3: number
+}
+
+export type IndustrialistQuarterlyComparison = {
+  quarter: string
+  current: number
+  previous: number
+  growth: number
+}
+
+export type IndustrialistTransaction = {
+  id: string
+  type: 'income' | 'expense'
+  description: string
+  amount: number
+  date: string
+}
+
+export type IndustrialistNotification = {
+  id: string
+  title: string
+  description: string
+  date: string
+}
+
+export type IndustrialistEmissionsData = {
+  stats: IndustrialistMetricCard[]
+  monthly: IndustrialistMonthlyEmissionPoint[]
+  breakdown: IndustrialistBreakdownItem[]
+  incidents: IndustrialistIncident[]
+}
+
+export type IndustrialistProductionData = {
+  stats: IndustrialistMetricCard[]
+  monthly: IndustrialistProductionPoint[]
+  productLines: IndustrialistProductLine[]
+  weekly: IndustrialistWeeklyShiftPoint[]
+  workforce: {
+    totalWorkers: number
+    productionLines: number
+    activeShifts: number
+    capacityUsed: number
+  }
+}
+
+export type IndustrialistFinancesData = {
+  stats: IndustrialistMetricCard[]
+  monthly: Array<{
+    month: string
+    revenue: number
+    expenses: number
+    profit: number
+  }>
+  expenseBreakdown: Array<IndustrialistBreakdownItem & { amount: number }>
+  quarterly: IndustrialistQuarterlyComparison[]
+  transactions: IndustrialistTransaction[]
+  summary: {
+    totalRevenue: number
+    totalExpenses: number
+    totalProfit: number
+    taxesPaid: number
+  }
+}
+
 export type UtilitiesChartType = 'area' | 'bar' | 'line'
 
 export type UtilitiesChartTypeOption = {
@@ -278,6 +396,10 @@ export type DashboardData = {
   }
   industrialist: {
     companyInfo: IndustrialistCompanyInfo
+    notifications: IndustrialistNotification[]
+    emissions: IndustrialistEmissionsData
+    production: IndustrialistProductionData
+    finances: IndustrialistFinancesData
   }
   utilities: {
     chartTypes: UtilitiesChartTypeOption[]

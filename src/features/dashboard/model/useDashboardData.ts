@@ -14,6 +14,8 @@ export function useDashboardData<K extends keyof DashboardData>(section: K) {
       saveDeveloperObject: context.saveDeveloperObject,
       createDeveloperObject: context.createDeveloperObject,
       reportDeveloperObject: context.reportDeveloperObject,
+      reportIndustrialIncident: context.reportIndustrialIncident,
+      sendIndustrialSummaryReport: context.sendIndustrialSummaryReport,
       updateAkimatRequestStatus: context.updateAkimatRequestStatus,
       reviewAdminItem: context.reviewAdminItem,
     }),

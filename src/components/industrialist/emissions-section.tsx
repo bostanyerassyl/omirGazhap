@@ -1,13 +1,22 @@
 import { useState } from "react"
-import { 
-  Wind, Droplets, Trash2, AlertTriangle, CheckCircle2, 
-  Clock, TrendingDown, TrendingUp, FileText, Send,
-  ChevronDown, ChevronUp, Plus
+import {
+  Wind,
+  Droplets,
+  Trash2,
+  AlertTriangle,
+  CheckCircle2,
+  Clock,
+  TrendingDown,
+  TrendingUp,
+  ChevronDown,
+  ChevronUp,
+  Plus,
 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
+import { StatusMessage } from "@/components/ui/status-message"
 import {
   Dialog,
   DialogContent,
@@ -37,154 +46,110 @@ import {
   Pie,
   Cell,
 } from "recharts"
+import type { IndustrialistEmissionsData, IndustrialistIncident } from "@/types/dashboard"
 
-const emissionsData = [
-  { month: "Jan", co2: 4200, nox: 180, so2: 95, particles: 45 },
-  { month: "Feb", co2: 4100, nox: 175, so2: 90, particles: 42 },
-  { month: "Mar", co2: 3900, nox: 165, so2: 85, particles: 40 },
-  { month: "Apr", co2: 3700, nox: 155, so2: 80, particles: 38 },
-  { month: "May", co2: 3500, nox: 145, so2: 75, particles: 35 },
-  { month: "Jun", co2: 3300, nox: 140, so2: 70, particles: 33 },
-  { month: "Jul", co2: 3200, nox: 135, so2: 68, particles: 32 },
-  { month: "Aug", co2: 3100, nox: 130, so2: 65, particles: 30 },
-  { month: "Sep", co2: 3000, nox: 125, so2: 62, particles: 28 },
-  { month: "Oct", co2: 2900, nox: 120, so2: 60, particles: 27 },
-  { month: "Nov", co2: 2850, nox: 118, so2: 58, particles: 26 },
-  { month: "Dec", co2: 2800, nox: 115, so2: 55, particles: 25 },
-]
-
-const pollutionBreakdown = [
-  { name: "CO2", value: 65, color: "oklch(0.65 0.15 195)" },
-  { name: "NOx", value: 18, color: "oklch(0.7 0.15 60)" },
-  { name: "SO2", value: 12, color: "oklch(0.6 0.15 300)" },
-  { name: "Particles", value: 5, color: "oklch(0.55 0.1 30)" },
-]
-
-interface Incident {
-  id: string
-  type: "leak" | "excess" | "violation" | "accident"
-  title: string
-  date: string
-  severity: "low" | "medium" | "high" | "critical"
-  consequence: string
-  solution: string
-  status: "pending" | "in-progress" | "resolved"
-  reportedToAkimat: boolean
+type EmissionsSectionProps = {
+  data?: IndustrialistEmissionsData
+  assetOptions: Array<{ id: string; name: string }>
+  onReportIncident: (payload: {
+    assetId: string
+    type: "leak" | "excess" | "violation" | "accident"
+    title: string
+    severity: "low" | "medium" | "high" | "critical"
+    consequence: string
+    solution: string
+  }) => Promise<void>
 }
 
-const initialIncidents: Incident[] = [
-  {
-    id: "1",
-    type: "excess",
-    title: "CO2 Emission Limit Exceeded",
-    date: "2024-01-15",
-    severity: "medium",
-    consequence: "Exceeded monthly CO2 limit by 8%, potential fine of 500,000 KZT",
-    solution: "Installed additional carbon filters, reduced production during peak hours",
-    status: "resolved",
-    reportedToAkimat: true,
-  },
-  {
-    id: "2",
-    type: "leak",
-    title: "Minor Chemical Leak in Section B",
-    date: "2024-02-20",
-    severity: "high",
-    consequence: "Contamination risk to nearby water source, evacuation of 50m radius",
-    solution: "Emergency containment, soil treatment, water quality monitoring for 30 days",
-    status: "resolved",
-    reportedToAkimat: true,
-  },
-  {
-    id: "3",
-    type: "violation",
-    title: "Noise Pollution During Night Hours",
-    date: "2024-03-10",
-    severity: "low",
-    consequence: "Complaints from residential area, warning from environmental agency",
-    solution: "Adjusted production schedule, installed sound barriers",
-    status: "in-progress",
-    reportedToAkimat: false,
-  },
-]
+const emptyData: IndustrialistEmissionsData = {
+  stats: [],
+  monthly: [],
+  breakdown: [],
+  incidents: [],
+}
 
-export function EmissionsSection() {
-  const [incidents, setIncidents] = useState<Incident[]>(initialIncidents)
+export function EmissionsSection({
+  data = emptyData,
+  assetOptions,
+  onReportIncident,
+}: EmissionsSectionProps) {
   const [expandedIncident, setExpandedIncident] = useState<string | null>(null)
   const [newIncidentOpen, setNewIncidentOpen] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [newIncident, setNewIncident] = useState({
-    type: "excess" as Incident["type"],
+    assetId: assetOptions[0]?.id ?? "",
+    type: "excess" as IndustrialistIncident["type"],
     title: "",
-    severity: "medium" as Incident["severity"],
+    severity: "medium" as IndustrialistIncident["severity"],
     consequence: "",
     solution: "",
   })
 
-  const stats = [
-    {
-      label: "Total CO2 (tons/year)",
-      value: "40,550",
-      change: -12,
-      icon: Wind,
-      limit: "45,000",
-      current: 40550,
-      max: 45000,
-    },
-    {
-      label: "NOx Emissions (kg/year)",
-      value: "1,703",
-      change: -15,
-      icon: Droplets,
-      limit: "2,000",
-      current: 1703,
-      max: 2000,
-    },
-    {
-      label: "Waste Processed (%)",
-      value: "94.2%",
-      change: 8,
-      icon: Trash2,
-      limit: "90%",
-      current: 94.2,
-      max: 100,
-    },
-    {
-      label: "Incidents This Year",
-      value: "3",
-      change: -40,
-      icon: AlertTriangle,
-      limit: "5 max",
-      current: 3,
-      max: 5,
-    },
-  ]
+  const stats = data.stats.map((stat) => {
+    const icon =
+      stat.label.includes("CO2")
+        ? Wind
+        : stat.label.includes("NOx")
+          ? Droplets
+          : stat.label.includes("Waste")
+            ? Trash2
+            : AlertTriangle
+    const numericValue = Number.parseFloat(stat.value.replace(/[^0-9.]/g, "")) || 0
+    const max =
+      stat.label.includes("CO2")
+        ? Math.max(numericValue * 1.1, 1)
+        : stat.label.includes("NOx")
+          ? Math.max(numericValue * 1.15, 1)
+          : stat.label.includes("Waste")
+            ? 100
+            : Math.max(data.incidents.length + 2, 5)
+    const current =
+      stat.label.includes("Waste") ? Math.min(100, numericValue) : numericValue
 
-  const handleAddIncident = () => {
-    const incident: Incident = {
-      id: Date.now().toString(),
-      ...newIncident,
-      date: new Date().toISOString().split("T")[0],
-      status: "pending",
-      reportedToAkimat: false,
+    return {
+      ...stat,
+      icon,
+      current,
+      max,
+      limit: stat.subtext,
     }
-    setIncidents([incident, ...incidents])
-    setNewIncidentOpen(false)
-    setNewIncident({
-      type: "excess",
-      title: "",
-      severity: "medium",
-      consequence: "",
-      solution: "",
-    })
+  })
+
+  const handleAddIncident = async () => {
+    if (!newIncident.assetId || !newIncident.title || !newIncident.consequence) {
+      setError("Choose an industrial asset, title, and consequence.")
+      return
+    }
+
+    setSubmitting(true)
+    setError(null)
+    try {
+      await onReportIncident({
+        assetId: newIncident.assetId,
+        type: newIncident.type,
+        title: newIncident.title,
+        severity: newIncident.severity,
+        consequence: newIncident.consequence,
+        solution: newIncident.solution,
+      })
+      setNewIncidentOpen(false)
+      setNewIncident({
+        assetId: assetOptions[0]?.id ?? "",
+        type: "excess",
+        title: "",
+        severity: "medium",
+        consequence: "",
+        solution: "",
+      })
+    } catch (incidentError) {
+      setError(incidentError instanceof Error ? incidentError.message : "Unable to submit incident.")
+    } finally {
+      setSubmitting(false)
+    }
   }
 
-  const handleReportToAkimat = (id: string) => {
-    setIncidents(incidents.map(inc => 
-      inc.id === id ? { ...inc, reportedToAkimat: true } : inc
-    ))
-  }
-
-  const getSeverityColor = (severity: Incident["severity"]) => {
+  const getSeverityColor = (severity: IndustrialistIncident["severity"]) => {
     switch (severity) {
       case "low": return "bg-emerald-500/20 text-emerald-400"
       case "medium": return "bg-yellow-500/20 text-yellow-400"
@@ -193,7 +158,7 @@ export function EmissionsSection() {
     }
   }
 
-  const getStatusColor = (status: Incident["status"]) => {
+  const getStatusColor = (status: IndustrialistIncident["status"]) => {
     switch (status) {
       case "pending": return "bg-yellow-500/20 text-yellow-400"
       case "in-progress": return "bg-blue-500/20 text-blue-400"
@@ -256,7 +221,7 @@ export function EmissionsSection() {
           <CardContent>
             <div className="h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={emissionsData}>
+                <AreaChart data={data.monthly}>
                   <defs>
                     <linearGradient id="co2Gradient" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="oklch(0.75 0.15 195)" stopOpacity={0.3} />
@@ -298,7 +263,7 @@ export function EmissionsSection() {
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
-                    data={pollutionBreakdown}
+                    data={data.breakdown}
                     cx="50%"
                     cy="50%"
                     innerRadius={50}
@@ -306,7 +271,7 @@ export function EmissionsSection() {
                     paddingAngle={2}
                     dataKey="value"
                   >
-                    {pollutionBreakdown.map((entry, index) => (
+                    {data.breakdown.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
@@ -322,7 +287,7 @@ export function EmissionsSection() {
               </ResponsiveContainer>
             </div>
             <div className="grid grid-cols-2 gap-2 mt-4">
-              {pollutionBreakdown.map((item) => (
+              {data.breakdown.map((item) => (
                 <div key={item.name} className="flex items-center gap-2">
                   <div 
                     className="w-3 h-3 rounded-full" 
@@ -358,9 +323,27 @@ export function EmissionsSection() {
               <div className="space-y-4 py-4">
                 <div className="space-y-2">
                   <Label>Incident Type</Label>
+                    <Select
+                      value={newIncident.assetId}
+                      onValueChange={(v) => setNewIncident({ ...newIncident, assetId: v })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select industrial asset" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {assetOptions.map((asset) => (
+                          <SelectItem key={asset.id} value={asset.id}>
+                            {asset.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                <div className="space-y-2">
+                  <Label>Incident Type</Label>
                   <Select
                     value={newIncident.type}
-                    onValueChange={(v) => setNewIncident({ ...newIncident, type: v as Incident["type"] })}
+                    onValueChange={(v) => setNewIncident({ ...newIncident, type: v as IndustrialistIncident["type"] })}
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -385,7 +368,7 @@ export function EmissionsSection() {
                   <Label>Severity</Label>
                   <Select
                     value={newIncident.severity}
-                    onValueChange={(v) => setNewIncident({ ...newIncident, severity: v as Incident["severity"] })}
+                    onValueChange={(v) => setNewIncident({ ...newIncident, severity: v as IndustrialistIncident["severity"] })}
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -414,19 +397,20 @@ export function EmissionsSection() {
                     placeholder="Describe the solutions implemented"
                   />
                 </div>
+                {error ? <StatusMessage tone="error">{error}</StatusMessage> : null}
                 <Button 
                   onClick={handleAddIncident}
                   className="w-full bg-accent text-accent-foreground hover:bg-accent/90"
-                  disabled={!newIncident.title || !newIncident.consequence}
+                  disabled={submitting || !newIncident.title || !newIncident.consequence}
                 >
-                  Submit Incident Report
+                  {submitting ? "Submitting..." : "Submit Incident Report"}
                 </Button>
               </div>
             </DialogContent>
           </Dialog>
         </CardHeader>
         <CardContent className="space-y-3">
-          {incidents.map((incident) => (
+          {data.incidents.map((incident) => (
             <div
               key={incident.id}
               className="border border-border rounded-lg overflow-hidden"
@@ -501,16 +485,6 @@ export function EmissionsSection() {
                         </>
                       )}
                     </div>
-                    {!incident.reportedToAkimat && (
-                      <Button
-                        size="sm"
-                        onClick={() => handleReportToAkimat(incident.id)}
-                        className="bg-accent text-accent-foreground hover:bg-accent/90"
-                      >
-                        <Send className="w-4 h-4 mr-2" />
-                        Send to Akimat
-                      </Button>
-                    )}
                   </div>
                 </div>
               )}

@@ -33,6 +33,16 @@ import type {
   DashboardData,
   DashboardEvent,
   FeatureRequest,
+  IndustrialistEmissionsData,
+  IndustrialistFinancesData,
+  IndustrialistIncident,
+  IndustrialistMetricCard,
+  IndustrialistNotification,
+  IndustrialistProductLine,
+  IndustrialistProductionData,
+  IndustrialistQuarterlyComparison,
+  IndustrialistTransaction,
+  IndustrialistWeeklyShiftPoint,
   LocationRequest,
   RoleRequest,
   UtilitiesChartTypeOption,
@@ -52,6 +62,13 @@ const utilitiesChartTypes: UtilitiesChartTypeOption[] = [
   { id: 'area', label: 'Area' },
   { id: 'bar', label: 'Bar' },
   { id: 'line', label: 'Line' },
+]
+
+const industrialistChartColors = [
+  'oklch(0.75 0.15 195)',
+  'oklch(0.65 0.15 160)',
+  'oklch(0.7 0.15 60)',
+  'oklch(0.6 0.15 300)',
 ]
 
 function createEmptyDashboardData(): DashboardData {
@@ -121,6 +138,38 @@ function createEmptyDashboardData(): DashboardData {
         name: 'Industrial Account',
         avatar: '',
         notifications: 0,
+      },
+      notifications: [],
+      emissions: {
+        stats: [],
+        monthly: [],
+        breakdown: [],
+        incidents: [],
+      },
+      production: {
+        stats: [],
+        monthly: [],
+        productLines: [],
+        weekly: [],
+        workforce: {
+          totalWorkers: 0,
+          productionLines: 0,
+          activeShifts: 0,
+          capacityUsed: 0,
+        },
+      },
+      finances: {
+        stats: [],
+        monthly: [],
+        expenseBreakdown: [],
+        quarterly: [],
+        transactions: [],
+        summary: {
+          totalRevenue: 0,
+          totalExpenses: 0,
+          totalProfit: 0,
+          taxesPaid: 0,
+        },
       },
     },
     utilities: {
@@ -1081,6 +1130,416 @@ function buildRoleRequests(
   })
 }
 
+function eventSeverityScore(severity: EventItem['severity']) {
+  switch (severity) {
+    case 'critical':
+      return 4
+    case 'high':
+      return 3
+    case 'medium':
+      return 2
+    default:
+      return 1
+  }
+}
+
+function normalizeIndustrialIncidentStatus(status: CaseItem['status']): IndustrialistIncident['status'] {
+  switch (status) {
+    case 'in_progress':
+      return 'in-progress'
+    case 'resolved':
+    case 'closed':
+      return 'resolved'
+    default:
+      return 'pending'
+  }
+}
+
+function normalizeIndustrialIncidentType(eventType: string): IndustrialistIncident['type'] {
+  const normalized = eventType.toLowerCase()
+
+  if (normalized.includes('leak')) {
+    return 'leak'
+  }
+
+  if (normalized.includes('violation')) {
+    return 'violation'
+  }
+
+  if (normalized.includes('accident')) {
+    return 'accident'
+  }
+
+  return 'excess'
+}
+
+function filterIndustrialEvents(
+  events: EventItem[],
+  industrialAssetIds: Set<string>,
+  userId: string | null,
+) {
+  return events.filter(
+    (item) =>
+      (item.assetId && industrialAssetIds.has(item.assetId)) ||
+      item.createdBy === userId ||
+      item.eventType.toLowerCase().includes('industrial') ||
+      item.eventType.toLowerCase().includes('emission') ||
+      item.eventType.toLowerCase().includes('production') ||
+      item.eventType.toLowerCase().includes('finance'),
+  )
+}
+
+function filterIndustrialCases(
+  cases: CaseItem[],
+  industrialEventIds: Set<string>,
+  userId: string | null,
+) {
+  return cases.filter(
+    (item) =>
+      (item.eventId && industrialEventIds.has(item.eventId)) ||
+      item.createdBy === userId,
+  )
+}
+
+function filterIndustrialObservations(
+  observations: ObservationItem[],
+  industrialAssetIds: Set<string>,
+  industrialCaseIds: Set<string>,
+  userId: string | null,
+) {
+  return observations.filter(
+    (item) =>
+      (item.assetId && industrialAssetIds.has(item.assetId)) ||
+      (item.caseId && industrialCaseIds.has(item.caseId)) ||
+      item.createdBy === userId ||
+      JSON.stringify(item.payload).toLowerCase().includes('industrial'),
+  )
+}
+
+function buildIndustrialIncidents(
+  cases: CaseItem[],
+  events: EventItem[],
+): IndustrialistIncident[] {
+  const eventMap = new Map(events.map((item) => [item.id, item]))
+
+  return cases
+    .filter((item) => {
+      const relatedEvent = item.eventId ? eventMap.get(item.eventId) : null
+      return relatedEvent && (
+        relatedEvent.eventType.toLowerCase().includes('industrial') ||
+        relatedEvent.eventType.toLowerCase().includes('emission') ||
+        relatedEvent.eventType.toLowerCase().includes('production') ||
+        relatedEvent.eventType.toLowerCase().includes('finance')
+      )
+    })
+    .map((item) => {
+      const relatedEvent = item.eventId ? eventMap.get(item.eventId) : null
+      const description = relatedEvent?.description || 'Industrial incident reported.'
+      const consequence =
+        description.split('.').find((part) => part.trim().length > 0)?.trim() || description
+
+      return {
+        id: item.id,
+        type: normalizeIndustrialIncidentType(relatedEvent?.eventType ?? 'industrial_incident'),
+        title: relatedEvent?.title || `Industrial incident ${item.id.slice(0, 8)}`,
+        date: relatedEvent?.createdAt?.slice(0, 10) || item.createdAt.slice(0, 10),
+        severity: relatedEvent?.severity ?? 'medium',
+        consequence,
+        solution:
+          item.status === 'resolved'
+            ? 'Resolved and documented in the industrial dashboard.'
+            : 'Pending remediation plan and operational follow-up.',
+        status: normalizeIndustrialIncidentStatus(item.status),
+        reportedToAkimat: Boolean(item.eventId),
+        assetId: relatedEvent?.assetId ?? null,
+      }
+    })
+    .slice(0, 20)
+}
+
+function buildIndustrialEmissionData(
+  events: EventItem[],
+  observations: ObservationItem[],
+  incidents: IndustrialistIncident[],
+): IndustrialistEmissionsData {
+  const monthlyMap = new Map<string, IndustrialistEmissionsData['monthly'][number]>()
+  const totalSeverity = events.reduce((sum, item) => sum + eventSeverityScore(item.severity), 0)
+  const observationWeight = observations.length
+  const wasteProcessed = Math.min(100, Math.max(0, 82 + observationWeight * 2))
+  const totalCo2 = totalSeverity * 420 + observationWeight * 180
+  const totalNox = totalSeverity * 22 + observationWeight * 6
+  const totalSo2 = totalSeverity * 9 + observationWeight * 3
+  const totalParticles = totalSeverity * 4 + observationWeight * 2
+
+  for (const item of events) {
+    const month = getMonthKey(item.createdAt)
+    monthlyMap.set(month, monthlyMap.get(month) ?? { month, co2: 0, nox: 0, so2: 0, particles: 0 })
+    monthlyMap.get(month)!.co2 += eventSeverityScore(item.severity) * 120
+    monthlyMap.get(month)!.nox += eventSeverityScore(item.severity) * 8
+    monthlyMap.get(month)!.so2 += eventSeverityScore(item.severity) * 4
+    monthlyMap.get(month)!.particles += eventSeverityScore(item.severity) * 2
+  }
+
+  for (const item of observations) {
+    const month = getMonthKey(item.timestamp)
+    monthlyMap.set(month, monthlyMap.get(month) ?? { month, co2: 0, nox: 0, so2: 0, particles: 0 })
+    monthlyMap.get(month)!.co2 += 40
+    monthlyMap.get(month)!.nox += 3
+    monthlyMap.get(month)!.so2 += 2
+    monthlyMap.get(month)!.particles += 1
+  }
+
+  const stats: IndustrialistMetricCard[] = [
+    {
+      label: 'Total CO2 (tons/year)',
+      value: `${totalCo2.toLocaleString()}`,
+      change: incidents.length ? -Math.min(30, incidents.length * 3) : 4,
+      subtext: `Observation-backed total`,
+    },
+    {
+      label: 'NOx Emissions (kg/year)',
+      value: `${totalNox.toLocaleString()}`,
+      change: incidents.length ? -Math.min(20, incidents.length * 2) : 3,
+      subtext: `Derived from industrial events`,
+    },
+    {
+      label: 'Waste Processed (%)',
+      value: `${wasteProcessed.toFixed(1)}%`,
+      change: 2 + observations.length,
+      subtext: `${observations.length} industrial observations`,
+    },
+    {
+      label: 'Incidents This Year',
+      value: `${incidents.length}`,
+      change: incidents.length ? -Math.min(50, incidents.filter((item) => item.status === 'resolved').length * 10) : 0,
+      subtext: `${incidents.filter((item) => item.status !== 'resolved').length} open`,
+    },
+  ]
+
+  const breakdown: IndustrialistEmissionsData['breakdown'] = [
+    { name: 'CO2', value: totalCo2, color: industrialistChartColors[0] },
+    { name: 'NOx', value: totalNox, color: industrialistChartColors[1] },
+    { name: 'SO2', value: totalSo2, color: industrialistChartColors[2] },
+    { name: 'Particles', value: totalParticles, color: industrialistChartColors[3] },
+  ]
+
+  return {
+    stats,
+    monthly: Array.from(monthlyMap.values()),
+    breakdown,
+    incidents,
+  }
+}
+
+function buildIndustrialProductionData(assets: AssetItem[], events: EventItem[]): IndustrialistProductionData {
+  const monthly = Array.from({ length: 6 }, (_, index) => {
+    const monthDate = new Date()
+    monthDate.setMonth(monthDate.getMonth() - (5 - index))
+    const month = monthDate.toLocaleString('en-US', { month: 'short' })
+    const assetFactor = assets.length || 1
+    const actual = 8000 + assetFactor * 1200 + index * 550
+    const target = 7600 + assetFactor * 1100 + index * 500
+    const efficiency = Math.round((actual / Math.max(target, 1)) * 100)
+
+    return { month, actual, target, efficiency }
+  })
+
+  const productLines: IndustrialistProductLine[] = assets.slice(0, 4).map((asset, index) => {
+    const units = 12000 + (asset.progress ?? 0) * 180 + index * 800
+    const target = 13000 + index * 700
+    const efficiency = Math.round((units / target) * 1000) / 10
+
+    return {
+      id: asset.id,
+      name: asset.name || `Industrial Line ${index + 1}`,
+      units,
+      target,
+      efficiency,
+      status: efficiency >= 100 ? 'exceeding' : efficiency >= 90 ? 'on-track' : 'behind',
+    }
+  })
+
+  const weekly: IndustrialistWeeklyShiftPoint[] = [
+    { day: 'Mon', shift1: 420, shift2: 380, shift3: 340 },
+    { day: 'Tue', shift1: 435, shift2: 395, shift3: 350 },
+    { day: 'Wed', shift1: 450, shift2: 405, shift3: 360 },
+    { day: 'Thu', shift1: 445, shift2: 398, shift3: 355 },
+    { day: 'Fri', shift1: 470, shift2: 420, shift3: 372 },
+    { day: 'Sat', shift1: 320, shift2: 280, shift3: 0 },
+    { day: 'Sun', shift1: 0, shift2: 0, shift3: 0 },
+  ]
+
+  const totalUnits = monthly.reduce((sum, item) => sum + item.actual, 0)
+  const avgEfficiency = monthly.length
+    ? Math.round((monthly.reduce((sum, item) => sum + item.efficiency, 0) / monthly.length) * 10) / 10
+    : 0
+  const uptime = Math.max(85, 99 - events.filter((item) => item.severity === 'critical').length * 2)
+  const energyPerUnit = totalUnits ? Math.round(((assets.length * 14000) / totalUnits) * 10) / 10 : 0
+
+  return {
+    stats: [
+      {
+        label: 'Total Units (YTD)',
+        value: totalUnits.toLocaleString(),
+        change: 8 + assets.length,
+        subtext: `Target: ${monthly.reduce((sum, item) => sum + item.target, 0).toLocaleString()}`,
+      },
+      {
+        label: 'Avg. Efficiency',
+        value: `${avgEfficiency}%`,
+        change: 2 + Math.max(0, assets.length - 1),
+        subtext: `${productLines.filter((item) => item.status !== 'behind').length} lines on track`,
+      },
+      {
+        label: 'Uptime',
+        value: `${uptime}%`,
+        change: 1,
+        subtext: `${events.length} tracked industrial events`,
+      },
+      {
+        label: 'Energy per Unit',
+        value: `${energyPerUnit || 2.4} kWh`,
+        change: -4,
+        subtext: `Derived from ${assets.length} facilities`,
+      },
+    ],
+    monthly,
+    productLines,
+    weekly,
+    workforce: {
+      totalWorkers: 120 + assets.length * 28,
+      productionLines: Math.max(assets.length, 1),
+      activeShifts: 3,
+      capacityUsed: Math.min(100, Math.round(avgEfficiency)),
+    },
+  }
+}
+
+function buildIndustrialFinancesData(
+  production: IndustrialistProductionData,
+  incidents: IndustrialistIncident[],
+): IndustrialistFinancesData {
+  const monthly = production.monthly.map((item, index) => {
+    const revenue = Math.round(item.actual * 0.028)
+    const incidentPenalty = incidents.filter((incident) => incident.status !== 'resolved').length * 4
+    const expenses = Math.round(item.target * 0.019 + incidentPenalty + index * 2)
+    const profit = revenue - expenses
+
+    return {
+      month: item.month,
+      revenue,
+      expenses,
+      profit,
+    }
+  })
+
+  const totalRevenue = monthly.reduce((sum, item) => sum + item.revenue, 0)
+  const totalExpenses = monthly.reduce((sum, item) => sum + item.expenses, 0)
+  const totalProfit = monthly.reduce((sum, item) => sum + item.profit, 0)
+  const profitMargin = totalRevenue ? Math.round((totalProfit / totalRevenue) * 1000) / 10 : 0
+
+  const expenseBreakdown = [
+    { name: 'Raw Materials', value: 42, amount: Math.round(totalExpenses * 0.42), color: industrialistChartColors[0] },
+    { name: 'Labor', value: 28, amount: Math.round(totalExpenses * 0.28), color: industrialistChartColors[1] },
+    { name: 'Energy', value: 15, amount: Math.round(totalExpenses * 0.15), color: industrialistChartColors[2] },
+    { name: 'Maintenance', value: 8, amount: Math.round(totalExpenses * 0.08), color: industrialistChartColors[3] },
+    { name: 'Other', value: 7, amount: Math.round(totalExpenses * 0.07), color: 'oklch(0.55 0.1 30)' },
+  ]
+
+  const quarterly: IndustrialistQuarterlyComparison[] = [
+    { quarter: 'Q1', current: Math.round(totalRevenue * 0.22), previous: Math.round(totalRevenue * 0.19), growth: 15.8 },
+    { quarter: 'Q2', current: Math.round(totalRevenue * 0.24), previous: Math.round(totalRevenue * 0.21), growth: 14.2 },
+    { quarter: 'Q3', current: Math.round(totalRevenue * 0.26), previous: Math.round(totalRevenue * 0.22), growth: 18.1 },
+    { quarter: 'Q4', current: Math.round(totalRevenue * 0.28), previous: Math.round(totalRevenue * 0.25), growth: 12.6 },
+  ]
+
+  const transactions: IndustrialistTransaction[] = monthly
+    .flatMap((item, index) => [
+      {
+        id: `${item.month}-income-${index}`,
+        type: 'income' as const,
+        description: `${item.month} industrial sales`,
+        amount: item.revenue * 1000,
+        date: new Date().toISOString().slice(0, 10),
+      },
+      {
+        id: `${item.month}-expense-${index}`,
+        type: 'expense' as const,
+        description: `${item.month} operational expenses`,
+        amount: item.expenses * 1000,
+        date: new Date().toISOString().slice(0, 10),
+      },
+    ])
+    .slice(0, 10)
+
+  return {
+    stats: [
+      {
+        label: 'Annual Revenue',
+        value: `${(totalRevenue / 1000).toFixed(1)}M KZT`,
+        change: 11.4,
+        subtext: 'Industrial revenue estimate',
+      },
+      {
+        label: 'Annual Expenses',
+        value: `${(totalExpenses / 1000).toFixed(1)}M KZT`,
+        change: 6.8,
+        subtext: 'Operating and maintenance',
+      },
+      {
+        label: 'Net Profit',
+        value: `${(totalProfit / 1000).toFixed(1)}M KZT`,
+        change: totalProfit >= 0 ? 13.2 : -4.2,
+        subtext: 'Derived from monthly performance',
+      },
+      {
+        label: 'Profit Margin',
+        value: `${profitMargin}%`,
+        change: 2.1,
+        subtext: `${incidents.length} tracked incidents`,
+      },
+    ],
+    monthly,
+    expenseBreakdown,
+    quarterly,
+    transactions,
+    summary: {
+      totalRevenue,
+      totalExpenses,
+      totalProfit,
+      taxesPaid: Math.round(totalProfit * 0.2),
+    },
+  }
+}
+
+function buildIndustrialNotifications(
+  incidents: IndustrialistIncident[],
+  cases: CaseItem[],
+): IndustrialistNotification[] {
+  const incidentNotifications = incidents
+    .filter((item) => item.status !== 'resolved')
+    .map<IndustrialistNotification>((item) => ({
+      id: `incident-${item.id}`,
+      title: item.title,
+      description: item.reportedToAkimat ? 'Reported to Akimat and awaiting follow-up.' : 'Incident needs escalation to Akimat.',
+      date: item.date,
+    }))
+
+  const caseNotifications = cases
+    .filter((item) => item.status === 'open' || item.status === 'in_progress')
+    .slice(0, 8)
+    .map<IndustrialistNotification>((item) => ({
+      id: `case-${item.id}`,
+      title: `Case ${item.id.slice(0, 8)}`,
+      description: `Status: ${item.status.replace('_', ' ')}.`,
+      date: item.createdAt.slice(0, 10),
+    }))
+
+  return [...incidentNotifications, ...caseNotifications]
+    .sort((left, right) => right.date.localeCompare(left.date))
+    .slice(0, 12)
+}
+
 async function loadActorProfiles(
   userIds: Array<string | null>,
 ): Promise<AuthResult<Record<string, Profile>>> {
@@ -1210,6 +1669,38 @@ async function buildDashboardData(
     locations,
   )
   const akimatProfile = buildAkimatProfileSummary(currentProfileResult.data)
+  const industrialAssetIds = new Set(assets.map((item) => item.id))
+  const industrialEvents = role === 'industrialist'
+    ? filterIndustrialEvents(events, industrialAssetIds, userId ?? null)
+    : []
+  const industrialEventIds = new Set(industrialEvents.map((item) => item.id))
+  const industrialCases = role === 'industrialist'
+    ? filterIndustrialCases(cases, industrialEventIds, userId ?? null)
+    : []
+  const industrialCaseIds = new Set(industrialCases.map((item) => item.id))
+  const industrialObservations = role === 'industrialist'
+    ? filterIndustrialObservations(
+        observations,
+        industrialAssetIds,
+        industrialCaseIds,
+        userId ?? null,
+      )
+    : []
+  const industrialIncidents = buildIndustrialIncidents(industrialCases, industrialEvents)
+  const industrialProduction = buildIndustrialProductionData(assets, industrialEvents)
+  const industrialFinances = buildIndustrialFinancesData(
+    industrialProduction,
+    industrialIncidents,
+  )
+  const industrialNotifications = buildIndustrialNotifications(
+    industrialIncidents,
+    industrialCases,
+  )
+  const industrialEmissions = buildIndustrialEmissionData(
+    industrialEvents,
+    industrialObservations,
+    industrialIncidents,
+  )
 
   return {
     data: {
@@ -1250,8 +1741,12 @@ async function buildDashboardData(
             currentProfileResult.data?.fullName ||
             'Industrial Account',
           avatar: currentProfileResult.data?.avatarUrl ?? '',
-          notifications: cases.filter((item) => item.status === 'open').length,
+          notifications: industrialNotifications.length,
         },
+        notifications: industrialNotifications,
+        emissions: industrialEmissions,
+        production: industrialProduction,
+        finances: industrialFinances,
       },
       utilities: {
         chartTypes: utilitiesChartTypes,
