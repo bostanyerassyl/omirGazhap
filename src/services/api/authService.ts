@@ -11,11 +11,16 @@ export type SignInPayload = {
   password: string
 }
 
+export type AuthServiceResult<T> = {
+  data: T | null
+  error: string | null
+}
+
 export const signUp = async ({
   email,
   password,
   fullName,
-}: SignUpPayload) => {
+}: SignUpPayload): Promise<AuthServiceResult<Awaited<ReturnType<typeof supabase.auth.signUp>>['data']>> => {
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
@@ -28,13 +33,22 @@ export const signUp = async ({
 
   if (error) {
     console.error('Auth error:', error.message)
-    return
+    return {
+      data: null,
+      error: error.message,
+    }
   }
 
-  return data
+  return {
+    data,
+    error: null,
+  }
 }
 
-export const signIn = async ({ email, password }: SignInPayload) => {
+export const signIn = async ({
+  email,
+  password,
+}: SignInPayload): Promise<AuthServiceResult<Awaited<ReturnType<typeof supabase.auth.signInWithPassword>>['data']>> => {
   const { data, error } = await supabase.auth.signInWithPassword({
     email,
     password,
@@ -42,9 +56,15 @@ export const signIn = async ({ email, password }: SignInPayload) => {
 
   if (error) {
     console.error('Login error:', error.message)
-    return
+    return {
+      data: null,
+      error: error.message,
+    }
   }
 
-  return data
+  return {
+    data,
+    error: null,
+  }
 }
 

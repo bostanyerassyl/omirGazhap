@@ -17,7 +17,7 @@ function useLoginForm() {
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
 
-    await signIn({
+    return signIn({
       email: formData.email,
       password: formData.password,
     })

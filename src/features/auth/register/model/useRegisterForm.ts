@@ -23,7 +23,7 @@ function useRegisterForm() {
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
 
-    await signUp({
+    return signUp({
       email: formData.email,
       password: formData.password,
       fullName: formData.fullName,
