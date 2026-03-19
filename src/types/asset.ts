@@ -7,6 +7,12 @@ export type AssetItem = {
   createdBy: string | null
   ownerProfileId: string | null
   ownerRole: string | null
+  name: string | null
+  address: string | null
+  description: string | null
+  contactPhone: string | null
+  deadline: string | null
+  progress: number | null
   type: string
   status: string
   createdAt: string

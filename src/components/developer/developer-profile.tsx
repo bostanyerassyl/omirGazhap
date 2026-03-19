@@ -25,8 +25,27 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet"
+import type { ConstructionObject } from "@/types/dashboard"
 
-export function DeveloperProfile() {
+type DeveloperProfileProps = {
+  objects: ConstructionObject[]
+}
+
+function getInitials(primary: string, secondary?: string): string {
+  const source = primary.trim() || (secondary ?? "").trim()
+  if (!source) {
+    return "DP"
+  }
+
+  const parts = source.split(/\s+/).filter(Boolean)
+  if (parts.length === 1) {
+    return parts[0].slice(0, 2).toUpperCase()
+  }
+
+  return `${parts[0][0] ?? ""}${parts[1][0] ?? ""}`.toUpperCase()
+}
+
+export function DeveloperProfile({ objects }: DeveloperProfileProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
@@ -60,6 +79,8 @@ export function DeveloperProfile() {
       avatar: authProfile.avatarUrl,
     })
   }, [authProfile])
+
+  const profileInitials = getInitials(profile.name, profile.companyName)
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -132,11 +153,11 @@ export function DeveloperProfile() {
   return (
     <Sheet>
       <SheetTrigger asChild>
-        <button className="h-10 w-10 rounded-full bg-card border border-border hover:border-accent/50 transition-colors flex items-center justify-center">
+        <button className="h-10 w-10 rounded-full border border-slate-500/60 bg-slate-950/70 shadow-lg shadow-black/30 hover:border-accent/60 transition-colors flex items-center justify-center">
           <Avatar className="h-9 w-9">
-            <AvatarImage src="/placeholder.svg" alt="Developer" />
-            <AvatarFallback className="bg-accent/20 text-accent text-sm font-medium">
-              AD
+            <AvatarImage src={profile.avatar} alt={profile.companyName} />
+            <AvatarFallback className="bg-slate-900/95 text-slate-100 text-sm font-medium">
+              {profileInitials}
             </AvatarFallback>
           </Avatar>
         </button>
@@ -162,11 +183,7 @@ export function DeveloperProfile() {
               <Avatar className="h-24 w-24 border-2 border-accent/30">
                 <AvatarImage src={profile.avatar} alt={profile.companyName} />
                 <AvatarFallback className="bg-accent/20 text-accent text-2xl font-medium">
-                  {profile.companyName
-                    .split(' ')
-                    .map((part) => part[0])
-                    .join('')
-                    .slice(0, 2)}
+                  {profileInitials}
                 </AvatarFallback>
               </Avatar>
               <label
@@ -285,16 +302,27 @@ export function DeveloperProfile() {
           {/* Stats */}
           <div className="grid grid-cols-3 gap-3">
             <div className="bg-card border border-border rounded-lg p-3 text-center">
-              <p className="text-2xl font-semibold text-accent">5</p>
+              <p className="text-2xl font-semibold text-accent">
+                {objects.filter((item) => item.status !== "completed").length}
+              </p>
               <p className="text-xs text-muted-foreground">Active Projects</p>
             </div>
             <div className="bg-card border border-border rounded-lg p-3 text-center">
-              <p className="text-2xl font-semibold text-emerald-400">12</p>
+              <p className="text-2xl font-semibold text-emerald-400">
+                {objects.filter((item) => item.status === "completed").length}
+              </p>
               <p className="text-xs text-muted-foreground">Completed</p>
             </div>
             <div className="bg-card border border-border rounded-lg p-3 text-center">
-              <p className="text-2xl font-semibold text-foreground">4.8</p>
-              <p className="text-xs text-muted-foreground">Rating</p>
+              <p className="text-2xl font-semibold text-foreground">
+                {objects.length
+                  ? Math.round(
+                      objects.reduce((sum, item) => sum + item.progress, 0) / objects.length,
+                    )
+                  : 0}
+                %
+              </p>
+              <p className="text-xs text-muted-foreground">Avg. Progress</p>
             </div>
           </div>
         </div>
@@ -353,4 +381,3 @@ export function DeveloperProfile() {
     </Sheet>
   )
 }
-
