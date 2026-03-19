@@ -1,6 +1,4 @@
-"use client"
-
-import { useState } from "react"
+﻿import { useState } from "react"
 import { 
   User, 
   LogOut, 
@@ -258,8 +256,8 @@ export default function UtilitiesPage() {
                   <h3 className="text-sm font-medium text-muted-foreground mb-2">Avg. Daily Usage</h3>
                   <p className="text-2xl font-bold text-foreground">
                     {activeTab === "electricity" ? "12.4 kWh" :
-                     activeTab === "water" ? "8.2 m³" :
-                     activeTab === "gas" ? "6.8 m³" : "3.2 trips"}
+                     activeTab === "water" ? "8.2 m3" :
+                     activeTab === "gas" ? "6.8 m3" : "3.2 trips"}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">Per household</p>
                 </CardContent>
@@ -271,4 +269,6 @@ export default function UtilitiesPage() {
     </div>
   )
 }
+
+
 

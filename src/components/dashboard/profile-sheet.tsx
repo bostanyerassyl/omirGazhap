@@ -1,5 +1,3 @@
-"use client"
-
 import { useState } from "react"
 import { Camera, Mail, Phone, MapPin, Save, User } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"

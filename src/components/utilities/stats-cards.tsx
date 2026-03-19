@@ -1,5 +1,3 @@
-"use client"
-
 import { TrendingUp, TrendingDown, Minus, Zap, Droplets, Flame, Bus } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { cn } from "@/utils/cn"

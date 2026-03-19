@@ -1,5 +1,3 @@
-"use client"
-
 import { useState } from "react"
 import { Building2, MapPin } from "lucide-react"
 import { cn } from "@/utils/cn"

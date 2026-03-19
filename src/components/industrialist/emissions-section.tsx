@@ -1,5 +1,3 @@
-"use client"
-
 import { useState } from "react"
 import { 
   Wind, Droplets, Trash2, AlertTriangle, CheckCircle2, 

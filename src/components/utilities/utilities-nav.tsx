@@ -1,5 +1,3 @@
-"use client"
-
 import { Zap, Droplets, Flame, Bus, CalendarDays } from "lucide-react"
 import { cn } from "@/utils/cn"
 

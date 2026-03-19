@@ -1,5 +1,3 @@
-"use client"
-
 import { Accessibility, Bike, Users, Calendar, Bus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/utils/cn"

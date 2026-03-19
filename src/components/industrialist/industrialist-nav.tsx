@@ -1,5 +1,3 @@
-"use client"
-
 import { Factory, Leaf, TrendingUp, DollarSign } from "lucide-react"
 import { cn } from "@/utils/cn"
 

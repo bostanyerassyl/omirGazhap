@@ -1,5 +1,3 @@
-"use client"
-
 import { useState } from "react"
 import { Plus, Users, MapPin, Camera, X } from "lucide-react"
 import { Button } from "@/components/ui/button"

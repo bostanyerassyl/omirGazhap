@@ -1,6 +1,4 @@
-"use client"
-
-import { useState } from "react"
+﻿import { useState } from "react"
 import { 
   User,
   LogOut,
@@ -715,4 +713,6 @@ export default function AdminDashboard() {
     </div>
   )
 }
+
+
 

@@ -1,5 +1,3 @@
-"use client"
-
 import type { ElementType, ReactNode } from 'react'
 import { Building2, Shield, Wifi, Zap } from 'lucide-react'
 

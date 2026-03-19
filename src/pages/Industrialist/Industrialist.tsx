@@ -1,5 +1,3 @@
-"use client"
-
 import { useState } from "react"
 import { 
   User, Building2, LogOut, Bell, Settings,

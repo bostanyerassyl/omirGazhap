@@ -1,5 +1,3 @@
-"use client"
-
 import { useState } from "react"
 import { CityMap } from "@/components/dashboard/city-map"
 import { ProfileSheet } from "@/components/dashboard/profile-sheet"

@@ -1,6 +1,4 @@
-"use client"
-
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { Building2, CheckCircle2, Clock, AlertCircle } from "lucide-react"
 import type { ConstructionObject } from "./objects-list"
 
