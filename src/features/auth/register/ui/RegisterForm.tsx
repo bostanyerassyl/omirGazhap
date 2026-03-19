@@ -160,6 +160,7 @@ function RegisterForm() {
                   <SelectItem value="user">User</SelectItem>
                   <SelectItem value="developer">Developer</SelectItem>
                   <SelectItem value="industrialist">Industrialist</SelectItem>
+                  <SelectItem value="utilities">ЖКХ</SelectItem>
                 </SelectContent>
               </Select>
             </div>

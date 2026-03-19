@@ -3,15 +3,16 @@ import { useAuth } from '@/features/auth/model/AuthProvider'
 import { getUserProfileData } from '@/services/data/userDataService'
 
 export function useUserData() {
-  const { user, role, loading } = useAuth()
+  const { user, role, loading, profile } = useAuth()
 
   return useMemo(
     () => ({
       user,
       role,
       loading,
-      profile: getUserProfileData(user, role),
+      profile: getUserProfileData(profile, role),
+      rawProfile: profile,
     }),
-    [loading, role, user],
+    [loading, profile, role, user],
   )
 }

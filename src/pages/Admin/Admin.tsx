@@ -69,9 +69,17 @@ const typeIcons: Record<string, typeof Lightbulb> = {
 const roleIcons: Record<string, typeof User> = {
   resident: User,
   developer: Building2,
+  utilities: Zap,
   akimat: Shield,
   industrialist: Factory,
-  "public-utilities": Zap
+}
+
+const roleLabels: Record<string, string> = {
+  resident: "Resident",
+  developer: "Developer",
+  utilities: "ЖКХ",
+  akimat: "Akimat",
+  industrialist: "Industrialist",
 }
 
 export default function AdminDashboard() {
@@ -109,9 +117,9 @@ export default function AdminDashboard() {
   const getRoleColor = (role: string) => {
     switch (role) {
       case "developer": return "text-accent"
+      case "utilities": return "text-blue-400"
       case "akimat": return "text-amber-400"
       case "industrialist": return "text-orange-400"
-      case "public-utilities": return "text-blue-400"
       default: return "text-muted-foreground"
     }
   }
@@ -467,7 +475,9 @@ export default function AdminDashboard() {
                               <div className="flex items-center gap-1 text-xs">
                                 <span className="text-muted-foreground">Requesting:</span>
                                 <RoleIcon className={cn("h-3 w-3", getRoleColor(role.requestedRole))} />
-                                <span className={getRoleColor(role.requestedRole)}>{role.requestedRole}</span>
+                                <span className={getRoleColor(role.requestedRole)}>
+                                  {roleLabels[role.requestedRole] ?? role.requestedRole}
+                                </span>
                               </div>
                             </div>
                           </div>
@@ -531,7 +541,7 @@ export default function AdminDashboard() {
                   <>
                     <h4 className="font-medium">{selectedItem.fullName}</h4>
                     <p className="text-sm text-muted-foreground">{selectedItem.company}</p>
-                    <p className="text-sm">Requesting: <span className="font-medium">{selectedItem.requestedRole}</span></p>
+                    <p className="text-sm">Requesting: <span className="font-medium">{roleLabels[selectedItem.requestedRole] ?? selectedItem.requestedRole}</span></p>
                     <div className="flex flex-wrap gap-1 mt-2">
                       {selectedItem.documents.map(doc => (
                         <Badge key={doc} variant="secondary">{doc}</Badge>
