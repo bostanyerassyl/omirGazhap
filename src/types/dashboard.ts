@@ -367,10 +367,56 @@ export type IndustrialistFinancesData = {
 }
 
 export type UtilitiesChartType = 'area' | 'bar' | 'line'
+export type UtilitiesResourceKey = 'electricity' | 'water' | 'gas' | 'transport'
 
 export type UtilitiesChartTypeOption = {
   id: UtilitiesChartType
   label: string
+}
+
+export type UtilitiesChartPoint = {
+  month: string
+  current: number
+  previous: number
+  predicted: number
+}
+
+export type UtilitiesOperationalEvent = {
+  id: string
+  title: string
+  description: string
+  type: 'warning' | 'prediction' | 'opportunity' | 'alert'
+  resource: UtilitiesResourceKey
+  impact: 'high' | 'medium' | 'low'
+  predictedChange: number
+  date: string
+  location: string
+  status: 'pending' | 'in-progress' | 'resolved'
+}
+
+export type UtilitiesResourceMetrics = {
+  unit: string
+  currentValue: number
+  previousValue: number
+  efficiency: number
+  cost: number
+  monthly: UtilitiesChartPoint[]
+  peakHours: string
+  activeConnections: number
+  avgDailyUsage: string
+}
+
+export type UtilitiesDistrictMetric = {
+  id: string
+  name: string
+  consumption: number
+}
+
+export type UtilitiesReportTarget = {
+  assetId: string
+  name: string
+  resource: UtilitiesResourceKey
+  location: string
 }
 
 export type DashboardData = {
@@ -403,6 +449,10 @@ export type DashboardData = {
   }
   utilities: {
     chartTypes: UtilitiesChartTypeOption[]
+    resources: Record<UtilitiesResourceKey, UtilitiesResourceMetrics>
+    events: UtilitiesOperationalEvent[]
+    districts: UtilitiesDistrictMetric[]
+    reportTargets: UtilitiesReportTarget[]
   }
   admin: {
     totalUsers: number

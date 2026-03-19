@@ -51,6 +51,13 @@ type AppDataContextValue = {
     description: string
     assetId?: string | null
   }) => Promise<AuthResult<null>>
+  reportUtilitiesIssue: (payload: {
+    assetId: string
+    resource: 'electricity' | 'water' | 'gas' | 'transport'
+    title: string
+    description: string
+    priority: 'low' | 'medium' | 'high'
+  }) => Promise<AuthResult<null>>
   updateAkimatRequestStatus: (
     id: string,
     status: CitizenRequestStatus,
@@ -344,6 +351,83 @@ export function AppDataProvider({ children }: PropsWithChildren) {
           return {
             data: null,
             error: caseResult.error,
+          }
+        }
+
+        await loadData()
+
+        return {
+          data: null,
+          error: null,
+        }
+      },
+      async reportUtilitiesIssue({
+        assetId,
+        resource,
+        title,
+        description,
+        priority,
+      }) {
+        if (!user) {
+          return {
+            data: null,
+            error: new Error('User is not authenticated'),
+          }
+        }
+
+        const severity = priority === 'high' ? 3 : priority === 'medium' ? 2 : 1
+        const eventResult = await eventService.create({
+          assetId,
+          createdBy: user.id,
+          title,
+          description,
+          eventType: 'utility',
+          severity,
+          startsAt: new Date().toISOString(),
+          isPublic: true,
+        })
+
+        if (eventResult.error || !eventResult.data) {
+          return {
+            data: null,
+            error: eventResult.error ?? new Error('Unable to create utility report event'),
+          }
+        }
+
+        const caseResult = await caseService.create({
+          eventId: eventResult.data.id,
+          createdBy: user.id,
+          assignedRole: 'akimat',
+          status: 'open',
+          priority,
+          visibility: 'public',
+        })
+
+        if (caseResult.error || !caseResult.data) {
+          return {
+            data: null,
+            error: caseResult.error ?? new Error('Unable to create utility report case'),
+          }
+        }
+
+        const observationResult = await observationService.create({
+          assetId,
+          caseId: caseResult.data.id,
+          createdBy: user.id,
+          payload: {
+            category: 'utility',
+            resource,
+            title,
+            priority,
+            description,
+          },
+          reviewStatus: 'pending',
+        })
+
+        if (observationResult.error) {
+          return {
+            data: null,
+            error: observationResult.error,
           }
         }
 

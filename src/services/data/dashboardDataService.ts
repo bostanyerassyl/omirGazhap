@@ -46,6 +46,11 @@ import type {
   LocationRequest,
   RoleRequest,
   UtilitiesChartTypeOption,
+  UtilitiesDistrictMetric,
+  UtilitiesOperationalEvent,
+  UtilitiesReportTarget,
+  UtilitiesResourceKey,
+  UtilitiesResourceMetrics,
 } from '@/types/dashboard'
 import type { EventItem } from '@/types/event'
 import type { LocationItem } from '@/types/location'
@@ -174,6 +179,55 @@ function createEmptyDashboardData(): DashboardData {
     },
     utilities: {
       chartTypes: utilitiesChartTypes,
+      resources: {
+        electricity: {
+          unit: 'kWh',
+          currentValue: 0,
+          previousValue: 0,
+          efficiency: 0,
+          cost: 0,
+          monthly: [],
+          peakHours: '18:00 - 21:00',
+          activeConnections: 0,
+          avgDailyUsage: '0 kWh',
+        },
+        water: {
+          unit: 'm3',
+          currentValue: 0,
+          previousValue: 0,
+          efficiency: 0,
+          cost: 0,
+          monthly: [],
+          peakHours: '18:00 - 21:00',
+          activeConnections: 0,
+          avgDailyUsage: '0 m3',
+        },
+        gas: {
+          unit: 'm3',
+          currentValue: 0,
+          previousValue: 0,
+          efficiency: 0,
+          cost: 0,
+          monthly: [],
+          peakHours: '18:00 - 21:00',
+          activeConnections: 0,
+          avgDailyUsage: '0 m3',
+        },
+        transport: {
+          unit: 'trips',
+          currentValue: 0,
+          previousValue: 0,
+          efficiency: 0,
+          cost: 0,
+          monthly: [],
+          peakHours: '18:00 - 21:00',
+          activeConnections: 0,
+          avgDailyUsage: '0 trips',
+        },
+      },
+      events: [],
+      districts: [],
+      reportTargets: [],
     },
     admin: {
       totalUsers: 0,
@@ -1540,6 +1594,186 @@ function buildIndustrialNotifications(
     .slice(0, 12)
 }
 
+function normalizeUtilityResource(input: string): UtilitiesResourceKey {
+  const normalized = input.toLowerCase()
+
+  if (normalized.includes('water')) return 'water'
+  if (normalized.includes('gas')) return 'gas'
+  if (normalized.includes('transport') || normalized.includes('bus') || normalized.includes('traffic')) {
+    return 'transport'
+  }
+
+  return 'electricity'
+}
+
+function normalizeUtilityEventType(item: EventItem): UtilitiesOperationalEvent['type'] {
+  if (item.severity === 'critical' || item.severity === 'high') {
+    return 'alert'
+  }
+
+  if (item.description.toLowerCase().includes('maintenance')) {
+    return 'opportunity'
+  }
+
+  if (item.description.toLowerCase().includes('forecast') || item.description.toLowerCase().includes('predicted')) {
+    return 'prediction'
+  }
+
+  return 'warning'
+}
+
+function buildUtilityEvents(
+  events: EventItem[],
+  cases: CaseItem[],
+): UtilitiesOperationalEvent[] {
+  const caseByEventId = new Map(
+    cases
+      .filter((item) => item.eventId)
+      .map((item) => [item.eventId as string, item]),
+  )
+
+  return events.map((item) => {
+    const relatedCase = caseByEventId.get(item.id)
+    const resource = normalizeUtilityResource(
+      `${item.title} ${item.eventType} ${item.description}`,
+    )
+    const predictedChange =
+      item.severity === 'critical'
+        ? 24
+        : item.severity === 'high'
+          ? 16
+          : item.severity === 'medium'
+            ? 9
+            : 4
+
+    return {
+      id: item.id,
+      title: item.title,
+      description: item.description,
+      type: normalizeUtilityEventType(item),
+      resource,
+      impact:
+        item.severity === 'critical' || item.severity === 'high'
+          ? 'high'
+          : item.severity === 'medium'
+            ? 'medium'
+            : 'low',
+      predictedChange,
+      date: item.createdAt.slice(0, 10),
+      location: item.locationName ?? 'Unknown location',
+      status:
+        relatedCase?.status === 'resolved' || relatedCase?.status === 'closed'
+          ? 'resolved'
+          : relatedCase?.status === 'in_progress'
+            ? 'in-progress'
+            : 'pending',
+    }
+  })
+}
+
+function buildUtilitiesDistricts(
+  locations: LocationItem[],
+  observations: ObservationItem[],
+): UtilitiesDistrictMetric[] {
+  return locations.map((location) => {
+    const matchingObservations = observations.filter(
+      (item) => item.locationId === location.id,
+    )
+    const consumption = Math.max(
+      12,
+      Math.min(98, 35 + matchingObservations.length * 12),
+    )
+
+    return {
+      id: location.id,
+      name: location.name,
+      consumption,
+    }
+  })
+}
+
+function buildUtilitiesResources(
+  events: EventItem[],
+  observations: ObservationItem[],
+  assets: AssetItem[],
+): Record<UtilitiesResourceKey, UtilitiesResourceMetrics> {
+  const base = {
+    electricity: {
+      unit: 'kWh',
+      avgDailyUsage: '12.4 kWh',
+    },
+    water: {
+      unit: 'm3',
+      avgDailyUsage: '8.2 m3',
+    },
+    gas: {
+      unit: 'm3',
+      avgDailyUsage: '6.8 m3',
+    },
+    transport: {
+      unit: 'trips',
+      avgDailyUsage: '3.2 trips',
+    },
+  } as const
+
+  return (Object.keys(base) as UtilitiesResourceKey[]).reduce<Record<UtilitiesResourceKey, UtilitiesResourceMetrics>>(
+    (accumulator, resource) => {
+      const relatedEvents = events.filter((item) =>
+        normalizeUtilityResource(`${item.title} ${item.eventType} ${item.description}`) === resource,
+      )
+      const relatedObservations = observations.filter((item) =>
+        JSON.stringify(item.payload).toLowerCase().includes(resource === 'transport' ? 'traffic' : resource),
+      )
+      const relatedAssets = assets.filter((item) =>
+        normalizeUtilityResource(`${item.name ?? ''} ${item.type} ${item.description ?? ''}`) === resource,
+      )
+      const monthly = Array.from({ length: 6 }, (_, index) => {
+        const monthDate = new Date()
+        monthDate.setMonth(monthDate.getMonth() - (5 - index))
+        const month = monthDate.toLocaleString('en-US', { month: 'short' })
+        const current = 200 + relatedEvents.length * 30 + relatedObservations.length * 18 + index * 22 + relatedAssets.length * 10
+        const previous = Math.max(0, current - (20 + relatedEvents.length * 4))
+        const predicted = current + Math.max(5, relatedObservations.length * 3)
+
+        return {
+          month,
+          current,
+          previous,
+          predicted,
+        }
+      })
+      const currentValue = monthly.reduce((sum, item) => sum + item.current, 0)
+      const previousValue = monthly.reduce((sum, item) => sum + item.previous, 0)
+
+      accumulator[resource] = {
+        unit: base[resource].unit,
+        currentValue,
+        previousValue,
+        efficiency: Math.max(55, Math.min(98, 72 + relatedObservations.length * 4 + relatedAssets.length * 3)),
+        cost: Math.round(currentValue * (resource === 'electricity' ? 0.08 : resource === 'water' ? 0.05 : resource === 'gas' ? 0.07 : 0.03)),
+        monthly,
+        peakHours: resource === 'transport' ? '07:00 - 09:00' : '18:00 - 21:00',
+        activeConnections: Math.max(1, relatedAssets.length * 24 + relatedObservations.length * 12),
+        avgDailyUsage: base[resource].avgDailyUsage,
+      }
+
+      return accumulator
+    },
+    {} as Record<UtilitiesResourceKey, UtilitiesResourceMetrics>,
+  )
+}
+
+function buildUtilitiesReportTargets(
+  assets: AssetItem[],
+): UtilitiesReportTarget[] {
+  return assets.slice(0, 20).map((asset) => ({
+    assetId: asset.id,
+    name: asset.name || `${asset.type} asset`,
+    resource: normalizeUtilityResource(`${asset.name ?? ''} ${asset.type}`),
+    location: asset.locationName ?? asset.address ?? 'Unknown location',
+  }))
+}
+
 async function loadActorProfiles(
   userIds: Array<string | null>,
 ): Promise<AuthResult<Record<string, Profile>>> {
@@ -1701,6 +1935,17 @@ async function buildDashboardData(
     industrialObservations,
     industrialIncidents,
   )
+  const utilityObservations = observations.filter((item) =>
+    JSON.stringify(item.payload).toLowerCase().includes('utility') ||
+    JSON.stringify(item.payload).toLowerCase().includes('electric') ||
+    JSON.stringify(item.payload).toLowerCase().includes('water') ||
+    JSON.stringify(item.payload).toLowerCase().includes('gas') ||
+    JSON.stringify(item.payload).toLowerCase().includes('traffic'),
+  )
+  const utilityResources = buildUtilitiesResources(events, utilityObservations, assets)
+  const utilityEvents = buildUtilityEvents(events, cases)
+  const utilityDistricts = buildUtilitiesDistricts(locations, utilityObservations)
+  const utilityReportTargets = buildUtilitiesReportTargets(assets)
 
   return {
     data: {
@@ -1750,6 +1995,10 @@ async function buildDashboardData(
       },
       utilities: {
         chartTypes: utilitiesChartTypes,
+        resources: utilityResources,
+        events: utilityEvents,
+        districts: utilityDistricts,
+        reportTargets: utilityReportTargets,
       },
       admin: {
         totalUsers,

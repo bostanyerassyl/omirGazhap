@@ -1,15 +1,16 @@
-﻿import { useState } from "react"
-import { 
-  User, 
-  LogOut, 
-  Settings, 
-  BarChart3, 
-  LineChart, 
+﻿import { useMemo, useState } from "react"
+import {
+  User,
+  LogOut,
+  Settings,
+  BarChart3,
+  LineChart,
   AreaChartIcon,
   Download,
   RefreshCw,
   Send,
-  CheckCircle2
+  CheckCircle2,
+  FileText,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -22,27 +23,58 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { StatusMessage } from "@/components/ui/status-message"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { Textarea } from "@/components/ui/textarea"
 import { UtilitiesNav } from "@/components/utilities/utilities-nav"
-import { ResourceChart } from "@/components/utilities/resource-chart"
-import { ScopeSelector } from "@/components/utilities/scope-selector"
-import { StatsCards } from "@/components/utilities/stats-cards"
-import { AIEventsPanel } from "@/components/utilities/ai-events-panel"
-import { UtilitiesMap } from "@/components/utilities/utilities-map"
+import { ResourceChartLive } from "@/components/utilities/resource-chart-live"
+import { ScopeSelectorLive } from "@/components/utilities/scope-selector-live"
+import { StatsCardsLive } from "@/components/utilities/stats-cards-live"
+import { OperationalEventsPanel } from "@/components/utilities/operational-events-panel"
+import { UtilitiesMapLive } from "@/components/utilities/utilities-map-live"
 import { useAuth } from "@/features/auth/model/AuthProvider"
 import { useDashboardData } from "@/features/dashboard/model/useDashboardData"
+import type { UtilitiesResourceKey, UtilitiesResourceMetrics } from "@/types/dashboard"
 import { cn } from "@/utils/cn"
 import { useNavigate } from "react-router-dom"
 
+const emptyMetrics: UtilitiesResourceMetrics = {
+  unit: "",
+  currentValue: 0,
+  previousValue: 0,
+  efficiency: 0,
+  cost: 0,
+  monthly: [],
+  peakHours: "No data",
+  activeConnections: 0,
+  avgDailyUsage: "0",
+}
+
 export default function UtilitiesPage() {
-  const [activeTab, setActiveTab] = useState("electricity")
+  const [activeTab, setActiveTab] = useState<UtilitiesResourceKey | "events">("electricity")
   const [scope, setScope] = useState("city")
   const [district, setDistrict] = useState<string | null>(null)
-  const [building, setBuilding] = useState<string | null>(null)
   const [chartType, setChartType] = useState<"area" | "bar" | "line">("area")
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [reportSent, setReportSent] = useState(false)
-  const { logout } = useAuth()
-  const { data, error, reloadData } = useDashboardData("utilities")
+  const [reportDialogOpen, setReportDialogOpen] = useState(false)
+  const [reportError, setReportError] = useState<string | null>(null)
+  const { logout, profile } = useAuth()
+  const { data, error, reloadData, reportUtilitiesIssue } = useDashboardData("utilities")
   const navigate = useNavigate()
 
   const chartIcons = {
@@ -51,28 +83,106 @@ export default function UtilitiesPage() {
     line: LineChart,
   } as const
 
-  const handleScopeChange = (newScope: string, newDistrict: string | null, newBuilding: string | null) => {
+  const districtOptions = data?.districts ?? []
+  const selectedDistrict = districtOptions.find((item) => item.id === district) ?? null
+  const resourceKey = activeTab === "events" ? "electricity" : activeTab
+  const activeMetrics = data?.resources[resourceKey] ?? emptyMetrics
+  const filteredTargets = useMemo(() => {
+    const targets = data?.reportTargets ?? []
+    const sameResource = targets.filter((item) => item.resource === resourceKey)
+    return sameResource.length > 0 ? sameResource : targets
+  }, [data?.reportTargets, resourceKey])
+
+  const [reportForm, setReportForm] = useState({
+    assetId: "",
+    resource: "electricity" as UtilitiesResourceKey,
+    title: "",
+    description: "",
+    priority: "medium" as "low" | "medium" | "high",
+  })
+
+  const handleScopeChange = (newScope: string, newDistrict: string | null) => {
     setScope(newScope)
     setDistrict(newDistrict)
-    setBuilding(newBuilding)
   }
 
   const handleDistrictSelect = (districtId: string) => {
     setScope("district")
     setDistrict(districtId)
-    setBuilding(null)
   }
 
   const handleRefresh = async () => {
     setIsRefreshing(true)
-    await new Promise(resolve => setTimeout(resolve, 1000))
+    await reloadData()
     setIsRefreshing(false)
   }
 
   const handleSendReport = async () => {
+    if (!reportForm.assetId || !reportForm.title || !reportForm.description) {
+      setReportError("Choose a target, title, and report description.")
+      return
+    }
+
+    setReportError(null)
+    const result = await reportUtilitiesIssue({
+      assetId: reportForm.assetId,
+      resource: reportForm.resource,
+      title: reportForm.title,
+      description: reportForm.description,
+      priority: reportForm.priority,
+    })
+
+    if (result.error) {
+      setReportError(result.error.message)
+      return
+    }
+
     setReportSent(true)
-    await new Promise(resolve => setTimeout(resolve, 2000))
-    setReportSent(false)
+    setReportDialogOpen(false)
+    setReportForm((current) => ({
+      ...current,
+      title: "",
+      description: "",
+      priority: "medium",
+    }))
+    window.setTimeout(() => setReportSent(false), 2500)
+  }
+
+  const handleExport = () => {
+    const rows =
+      activeTab === "events"
+        ? [
+            ["title", "resource", "impact", "status", "location", "date"],
+            ...(data?.events ?? []).map((item) => [
+              item.title,
+              item.resource,
+              item.impact,
+              item.status,
+              item.location,
+              item.date,
+            ]),
+          ]
+        : [
+            ["month", "current", "previous", "predicted", "unit"],
+            ...activeMetrics.monthly.map((item) => [
+              item.month,
+              `${item.current}`,
+              `${item.previous}`,
+              `${item.predicted}`,
+              activeMetrics.unit,
+            ]),
+          ]
+
+    const csv = rows
+      .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","))
+      .join("\n")
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement("a")
+    link.href = url
+    link.download = `utilities-${activeTab}-${new Date().toISOString().slice(0, 10)}.csv`
+    link.click()
+    URL.revokeObjectURL(url)
   }
 
   const handleLogout = async () => {
@@ -82,37 +192,35 @@ export default function UtilitiesPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-sm border-b border-border">
-        <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-          {/* Logo & Profile */}
+      <header className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-sm">
+        <div className="container mx-auto flex h-16 items-center justify-between px-4">
           <div className="flex items-center gap-4">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="h-10 w-10 rounded-full p-0">
                   <Avatar className="h-10 w-10 border-2 border-accent">
-                    <AvatarImage src="" />
+                    <AvatarImage src={profile?.avatarUrl ?? ""} />
                     <AvatarFallback className="bg-secondary text-foreground">PU</AvatarFallback>
                   </Avatar>
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-56 bg-card border-border">
+              <DropdownMenuContent align="start" className="w-56 border-border bg-card">
                 <div className="px-2 py-1.5">
-                  <p className="text-sm font-medium text-foreground">Public Utilities</p>
-                  <p className="text-xs text-muted-foreground">admin@utilities.alatau.kz</p>
+                  <p className="text-sm font-medium text-foreground">{profile?.fullName || "Public Utilities"}</p>
+                  <p className="text-xs text-muted-foreground">{profile?.email || "admin@utilities.alatau.kz"}</p>
                 </div>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem>
-                  <User className="w-4 h-4 mr-2" />
+                  <User className="mr-2 h-4 w-4" />
                   Profile Settings
                 </DropdownMenuItem>
                 <DropdownMenuItem>
-                  <Settings className="w-4 h-4 mr-2" />
+                  <Settings className="mr-2 h-4 w-4" />
                   System Settings
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem className="text-red-400" onClick={() => void handleLogout()}>
-                  <LogOut className="w-4 h-4 mr-2" />
+                  <LogOut className="mr-2 h-4 w-4" />
                   Sign Out
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -124,48 +232,148 @@ export default function UtilitiesPage() {
             </div>
           </div>
 
-          {/* Navigation */}
-          <UtilitiesNav activeTab={activeTab} onTabChange={setActiveTab} />
+          <UtilitiesNav activeTab={activeTab} onTabChange={(tab) => setActiveTab(tab as UtilitiesResourceKey | "events")} />
 
-          {/* Actions */}
           <div className="flex items-center gap-2">
-            <Button 
-              variant="outline" 
-              size="icon" 
-              className="bg-card"
-              onClick={handleRefresh}
-              disabled={isRefreshing}
-            >
-              <RefreshCw className={cn("w-4 h-4", isRefreshing && "animate-spin")} />
+            <Button variant="outline" size="icon" className="bg-card" onClick={handleRefresh} disabled={isRefreshing}>
+              <RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />
             </Button>
-            <Button variant="outline" className="gap-2 bg-card hidden sm:flex">
-              <Download className="w-4 h-4" />
+            <Button variant="outline" className="hidden gap-2 bg-card sm:flex" onClick={handleExport}>
+              <Download className="h-4 w-4" />
               Export
             </Button>
-            <Button 
-              variant="default" 
-              className="gap-2 bg-accent text-accent-foreground hover:bg-accent/90"
-              onClick={handleSendReport}
-              disabled={reportSent}
+            <Dialog
+              open={reportDialogOpen}
+              onOpenChange={(open) => {
+                setReportDialogOpen(open)
+                if (open) {
+                  setReportForm((current) => ({
+                    ...current,
+                    assetId: current.assetId || filteredTargets[0]?.assetId || "",
+                    resource: resourceKey,
+                  }))
+                }
+              }}
             >
-              {reportSent ? (
-                <>
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span className="hidden sm:inline">Sent!</span>
-                </>
-              ) : (
-                <>
-                  <Send className="w-4 h-4" />
-                  <span className="hidden sm:inline">Report to Akimat</span>
-                </>
-              )}
-            </Button>
+              <DialogTrigger asChild>
+                <Button variant="default" className="gap-2 bg-accent text-accent-foreground hover:bg-accent/90" disabled={reportSent}>
+                  {reportSent ? (
+                    <>
+                      <CheckCircle2 className="h-4 w-4" />
+                      <span className="hidden sm:inline">Sent!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Send className="h-4 w-4" />
+                      <span className="hidden sm:inline">Report to Akimat</span>
+                    </>
+                  )}
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="border-border bg-card">
+                <DialogHeader>
+                  <DialogTitle>Utility Report for Akimat</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 py-2">
+                  <div className="rounded-lg bg-secondary p-4">
+                    <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                      <FileText className="h-4 w-4 text-accent" />
+                      Submit a utility incident or operational report
+                    </div>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      Choose the target asset and describe what needs municipal review.
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Resource</Label>
+                    <Select
+                      value={reportForm.resource}
+                      onValueChange={(value) =>
+                        setReportForm((current) => ({
+                          ...current,
+                          resource: value as UtilitiesResourceKey,
+                          assetId: "",
+                        }))
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="electricity">Electricity</SelectItem>
+                        <SelectItem value="water">Water</SelectItem>
+                        <SelectItem value="gas">Gas</SelectItem>
+                        <SelectItem value="transport">Transport</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Target</Label>
+                    <Select value={reportForm.assetId} onValueChange={(value) => setReportForm((current) => ({ ...current, assetId: value }))}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select utility asset" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(data?.reportTargets ?? [])
+                          .filter((item) => item.resource === reportForm.resource)
+                          .map((target) => (
+                            <SelectItem key={target.assetId} value={target.assetId}>
+                              {target.name} · {target.location}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Title</Label>
+                    <Input
+                      value={reportForm.title}
+                      onChange={(event) => setReportForm((current) => ({ ...current, title: event.target.value }))}
+                      placeholder="Example: Water pressure instability"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Priority</Label>
+                    <Select
+                      value={reportForm.priority}
+                      onValueChange={(value) =>
+                        setReportForm((current) => ({
+                          ...current,
+                          priority: value as "low" | "medium" | "high",
+                        }))
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="low">Low</SelectItem>
+                        <SelectItem value="medium">Medium</SelectItem>
+                        <SelectItem value="high">High</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Description</Label>
+                    <Textarea
+                      value={reportForm.description}
+                      onChange={(event) => setReportForm((current) => ({ ...current, description: event.target.value }))}
+                      placeholder="Describe the issue, impact, and required response."
+                    />
+                  </div>
+                  {reportError ? <StatusMessage tone="error">{reportError}</StatusMessage> : null}
+                  <Button className="w-full bg-accent text-accent-foreground hover:bg-accent/90" onClick={() => void handleSendReport()}>
+                    <Send className="mr-2 h-4 w-4" />
+                    Submit Report
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
           </div>
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="container mx-auto px-4 py-6 space-y-6">
+      <main className="container mx-auto space-y-6 px-4 py-6">
         {error ? (
           <StatusMessage tone="error" className="flex items-center justify-between gap-3">
             <span>{error}</span>
@@ -174,23 +382,15 @@ export default function UtilitiesPage() {
             </Button>
           </StatusMessage>
         ) : null}
-        {activeTab === "events" ? (
-          /* Events Tab */
-          <AIEventsPanel />
-        ) : (
-          /* Resource Tabs */
-          <>
-            {/* Controls Row */}
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-              <ScopeSelector
-                scope={scope}
-                district={district}
-                building={building}
-                onScopeChange={handleScopeChange}
-              />
 
-              {/* Chart Type Selector */}
-              <div className="flex items-center gap-1 p-1 bg-secondary/50 rounded-lg">
+        {activeTab === "events" ? (
+          <OperationalEventsPanel events={data?.events ?? []} />
+        ) : (
+          <>
+            <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
+              <ScopeSelectorLive scope={scope} district={district} districts={districtOptions} onScopeChange={handleScopeChange} />
+
+              <div className="flex items-center gap-1 rounded-lg bg-secondary/50 p-1">
                 {(data?.chartTypes ?? []).map((type) => {
                   const Icon = chartIcons[type.id]
                   return (
@@ -198,13 +398,10 @@ export default function UtilitiesPage() {
                       key={type.id}
                       variant="ghost"
                       size="sm"
-                      className={cn(
-                        "gap-2",
-                        chartType === type.id && "bg-card shadow-sm"
-                      )}
+                      className={cn("gap-2", chartType === type.id && "bg-card shadow-sm")}
                       onClick={() => setChartType(type.id)}
                     >
-                      <Icon className="w-4 h-4" />
+                      <Icon className="h-4 w-4" />
                       <span className="hidden sm:inline">{type.label}</span>
                     </Button>
                   )
@@ -212,74 +409,53 @@ export default function UtilitiesPage() {
               </div>
             </div>
 
-            {/* Stats Cards */}
-            <StatsCards resource={activeTab} scope={scope} />
+            <StatsCardsLive resource={activeTab} scope={scope} metrics={activeMetrics} district={selectedDistrict} />
 
-            {/* Main Content Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Chart */}
-              <Card className="lg:col-span-2 bg-card border-border">
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+              <Card className="border-border bg-card lg:col-span-2">
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-lg flex items-center justify-between">
+                  <CardTitle className="flex items-center justify-between text-lg">
                     <span>Monthly Consumption</span>
                     <span className="text-sm font-normal text-muted-foreground">
-                      {scope === "city" ? "City-wide" : 
-                       scope === "district" ? `${district?.charAt(0).toUpperCase()}${district?.slice(1)} District` : 
-                       "Building Level"}
+                      {scope === "city" ? "City-wide" : selectedDistrict?.name ?? "District scope"}
                     </span>
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <ResourceChart 
-                    resource={activeTab} 
-                    scope={scope} 
-                    chartType={chartType}
-                  />
+                  <ResourceChartLive resource={activeTab} scope={scope} chartType={chartType} metrics={activeMetrics} district={selectedDistrict} />
                 </CardContent>
               </Card>
 
-              {/* Map */}
-              <Card className="bg-card border-border">
+              <Card className="border-border bg-card">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-lg">District Overview</CardTitle>
                 </CardHeader>
                 <CardContent className="p-2">
-                  <UtilitiesMap
-                    onDistrictSelect={handleDistrictSelect}
-                    selectedDistrict={district}
-                    resource={activeTab}
-                  />
+                  <UtilitiesMapLive onDistrictSelect={handleDistrictSelect} selectedDistrict={district} resource={activeTab} districts={districtOptions} />
                 </CardContent>
               </Card>
             </div>
 
-            {/* Additional Insights */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <Card className="bg-card border-border">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              <Card className="border-border bg-card">
                 <CardContent className="p-4">
-                  <h3 className="text-sm font-medium text-muted-foreground mb-2">Peak Hours</h3>
-                  <p className="text-2xl font-bold text-foreground">18:00 - 21:00</p>
-                  <p className="text-xs text-muted-foreground mt-1">Highest consumption period</p>
+                  <h3 className="mb-2 text-sm font-medium text-muted-foreground">Peak Hours</h3>
+                  <p className="text-2xl font-bold text-foreground">{activeMetrics.peakHours}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Highest consumption period</p>
                 </CardContent>
               </Card>
-              <Card className="bg-card border-border">
+              <Card className="border-border bg-card">
                 <CardContent className="p-4">
-                  <h3 className="text-sm font-medium text-muted-foreground mb-2">Active Connections</h3>
-                  <p className="text-2xl font-bold text-foreground">
-                    {scope === "city" ? "245,832" : scope === "district" ? "24,583" : "1"}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">Registered meters</p>
+                  <h3 className="mb-2 text-sm font-medium text-muted-foreground">Active Connections</h3>
+                  <p className="text-2xl font-bold text-foreground">{activeMetrics.activeConnections.toLocaleString()}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Registered meters</p>
                 </CardContent>
               </Card>
-              <Card className="bg-card border-border">
+              <Card className="border-border bg-card">
                 <CardContent className="p-4">
-                  <h3 className="text-sm font-medium text-muted-foreground mb-2">Avg. Daily Usage</h3>
-                  <p className="text-2xl font-bold text-foreground">
-                    {activeTab === "electricity" ? "12.4 kWh" :
-                     activeTab === "water" ? "8.2 m3" :
-                     activeTab === "gas" ? "6.8 m3" : "3.2 trips"}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">Per household</p>
+                  <h3 className="mb-2 text-sm font-medium text-muted-foreground">Avg. Daily Usage</h3>
+                  <p className="text-2xl font-bold text-foreground">{activeMetrics.avgDailyUsage}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Per household</p>
                 </CardContent>
               </Card>
             </div>
@@ -289,6 +465,3 @@ export default function UtilitiesPage() {
     </div>
   )
 }
-
-
-
