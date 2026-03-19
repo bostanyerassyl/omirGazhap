@@ -60,7 +60,13 @@ function EventsSheet({ events }: { events: Array<{ id: string; title: string; da
 }
 
 export default function DashboardPage() {
-  const { data, error, reloadData } = useDashboardData("dashboard")
+  const {
+    data,
+    error,
+    reloadData,
+    submitDashboardAppeal,
+    addDashboardPlace,
+  } = useDashboardData("dashboard")
   const [filters, setFilters] = useState<FilterState>({
     ramps: true,
     scooters: true,
@@ -96,9 +102,30 @@ export default function DashboardPage() {
 
         {/* Right - Action buttons */}
         <div className="flex items-center gap-1">
-          <MessagesPanel />
+          <MessagesPanel
+            appeals={data?.appeals ?? []}
+            events={data?.events ?? []}
+            news={data?.news ?? []}
+            situations={data?.situations ?? []}
+            onSubmitAppeal={async (payload) => {
+              const result = await submitDashboardAppeal(payload)
+
+              if (result.error) {
+                throw result.error
+              }
+            }}
+          />
           <EventsSheet events={data?.events ?? []} />
-          <AddContentDialog />
+          <AddContentDialog
+            locationOptions={data?.locationOptions ?? []}
+            onAddPlace={async (payload) => {
+              const result = await addDashboardPlace(payload)
+
+              if (result.error) {
+                throw result.error
+              }
+            }}
+          />
         </div>
       </header>
 
@@ -106,7 +133,7 @@ export default function DashboardPage() {
       <MapFilters filters={filters} onFilterChange={setFilters} />
 
       {/* Main map */}
-      <CityMap filters={filters} />
+      <CityMap filters={filters} dynamicMarkers={data?.mapMarkers ?? []} />
 
       {error ? (
         <div className="absolute left-4 right-4 top-20 z-30 md:left-auto md:right-4 md:w-[420px]">
@@ -120,7 +147,12 @@ export default function DashboardPage() {
       ) : null}
 
       {/* Bottom search bar */}
-      <RouteSearch />
+      <RouteSearch
+        suggestions={[
+          ...(data?.locationOptions.map((location) => location.name) ?? []),
+          ...(data?.mapMarkers.map((marker) => marker.label) ?? []),
+        ]}
+      />
     </div>
   )
 }

@@ -3,6 +3,7 @@ import { Plus, Users, MapPin } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { StatusMessage } from "@/components/ui/status-message"
 import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
@@ -14,6 +15,13 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
   addFriendToMap,
   addPoiToMap,
   getMapCenterPosition,
@@ -21,19 +29,36 @@ import {
   type PoiCategory,
 } from "@/features/map/model/map-actions"
 
-export function AddContentDialog() {
+type AddContentDialogProps = {
+  locationOptions: Array<{ id: string; name: string }>
+  onAddPlace: (payload: {
+    name: string
+    description: string
+    locationId?: string | null
+    photosCount?: number
+  }) => Promise<void>
+}
+
+export function AddContentDialog({
+  locationOptions,
+  onAddPlace,
+}: AddContentDialogProps) {
   const [open, setOpen] = useState(false)
   const [friendName, setFriendName] = useState("")
   const [friendAvatar, setFriendAvatar] = useState("")
   const [friendLatitude, setFriendLatitude] = useState("")
   const [friendLongitude, setFriendLongitude] = useState("")
   const [friendStatus, setFriendStatus] = useState<string | null>(null)
+  const [submittingPlace, setSubmittingPlace] = useState(false)
+  const [placeError, setPlaceError] = useState<string | null>(null)
+  const [placeSuccess, setPlaceSuccess] = useState<string | null>(null)
   const [placeData, setPlaceData] = useState({
     category: "events" as PoiCategory,
     name: "",
     latitude: "",
     longitude: "",
     description: "",
+    locationId: "",
     photos: [] as string[],
     status: null as string | null,
   })
@@ -63,36 +88,59 @@ export function AddContentDialog() {
     })
   }
 
-  const handleAddPlace = () => {
+  const handleAddPlace = async () => {
     const trimmedName = placeData.name.trim()
     if (!trimmedName) return
 
+    setSubmittingPlace(true)
+    setPlaceError(null)
+    setPlaceSuccess(null)
     setPlaceData((prev) => ({ ...prev, status: "Saving place..." }))
     const lat = placeData.latitude.trim() ? Number(placeData.latitude) : undefined
     const lng = placeData.longitude.trim() ? Number(placeData.longitude) : undefined
 
-    void addPoiToMap({
-      category: placeData.category,
-      name: trimmedName,
-      description: placeData.description.trim() || undefined,
-      latitude: Number.isFinite(lat) ? lat : undefined,
-      longitude: Number.isFinite(lng) ? lng : undefined,
-    }).then((result) => {
+    try {
+      await onAddPlace({
+        name: trimmedName,
+        description: placeData.description,
+        locationId: placeData.locationId || null,
+        photosCount: placeData.photos.length,
+      })
+
+      const result = await addPoiToMap({
+        category: placeData.category,
+        name: trimmedName,
+        description: placeData.description.trim() || undefined,
+        latitude: Number.isFinite(lat) ? lat : undefined,
+        longitude: Number.isFinite(lng) ? lng : undefined,
+      })
+
       if (!result.ok) {
-        setPlaceData((prev) => ({ ...prev, status: `Failed: ${result.error}` }))
+        setPlaceData((prev) => ({
+          ...prev,
+          status: `Saved to database, but map marker failed: ${result.error}`,
+        }))
         return
       }
+
       setPlaceData({
         category: "events",
         name: "",
         latitude: "",
         longitude: "",
         description: "",
+        locationId: "",
         photos: [],
         status: "Point added to map",
       })
+      setPlaceSuccess("Place submitted successfully.")
       setTimeout(() => setOpen(false), 500)
-    })
+    } catch (error) {
+      setPlaceError(error instanceof Error ? error.message : "Unable to add place.")
+      setPlaceData((prev) => ({ ...prev, status: "Failed to save place" }))
+    } finally {
+      setSubmittingPlace(false)
+    }
   }
 
   const handlePickOnMapAndAdd = async () => {
@@ -101,36 +149,60 @@ export function AddContentDialog() {
       setPlaceData((prev) => ({ ...prev, status: "Enter place name first" }))
       return
     }
+    setSubmittingPlace(true)
+    setPlaceError(null)
+    setPlaceSuccess(null)
     setPlaceData((prev) => ({ ...prev, status: "Click anywhere on the map to place this point..." }))
     setOpen(false)
     const picked = await pickPointOnMap()
     if (!picked.ok || !Number.isFinite(picked.latitude) || !Number.isFinite(picked.longitude)) {
       setOpen(true)
+      setSubmittingPlace(false)
       setPlaceData((prev) => ({ ...prev, status: `Placement failed: ${picked.error ?? "Unknown error"}` }))
       return
     }
 
-    const result = await addPoiToMap({
-      category: placeData.category,
-      name: trimmedName,
-      description: placeData.description.trim() || undefined,
-      latitude: picked.latitude,
-      longitude: picked.longitude,
-    })
-    if (!result.ok) {
+    try {
+      await onAddPlace({
+        name: trimmedName,
+        description: placeData.description,
+        locationId: placeData.locationId || null,
+        photosCount: placeData.photos.length,
+      })
+
+      const result = await addPoiToMap({
+        category: placeData.category,
+        name: trimmedName,
+        description: placeData.description.trim() || undefined,
+        latitude: picked.latitude,
+        longitude: picked.longitude,
+      })
+      if (!result.ok) {
+        setOpen(true)
+        setPlaceData((prev) => ({
+          ...prev,
+          status: `Saved to database, but map marker failed: ${result.error}`,
+        }))
+        return
+      }
+      setPlaceData({
+        category: "events",
+        name: "",
+        latitude: "",
+        longitude: "",
+        description: "",
+        locationId: "",
+        photos: [],
+        status: "Point added where you clicked",
+      })
+      setPlaceSuccess("Place submitted successfully.")
+    } catch (error) {
       setOpen(true)
-      setPlaceData((prev) => ({ ...prev, status: `Failed: ${result.error}` }))
-      return
+      setPlaceError(error instanceof Error ? error.message : "Unable to add place.")
+      setPlaceData((prev) => ({ ...prev, status: "Failed to save place" }))
+    } finally {
+      setSubmittingPlace(false)
     }
-    setPlaceData({
-      category: "events",
-      name: "",
-      latitude: "",
-      longitude: "",
-      description: "",
-      photos: [],
-      status: "Point added where you clicked",
-    })
   }
 
   return (
@@ -248,6 +320,8 @@ export function AddContentDialog() {
           </TabsContent>
 
           <TabsContent value="places" className="mt-4 space-y-4">
+            {placeError ? <StatusMessage tone="error">{placeError}</StatusMessage> : null}
+            {placeSuccess ? <StatusMessage tone="success">{placeSuccess}</StatusMessage> : null}
             <div className="space-y-2">
               <Label htmlFor="place-name" className="text-foreground">
                 Place Name
@@ -272,6 +346,27 @@ export function AddContentDialog() {
                 onChange={(e) => setPlaceData(prev => ({ ...prev, description: e.target.value }))}
                 className="bg-secondary border-border text-foreground min-h-[80px] resize-none"
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-foreground">Location</Label>
+              <Select
+                value={placeData.locationId}
+                onValueChange={(value) =>
+                  setPlaceData((prev) => ({ ...prev, locationId: value }))
+                }
+              >
+                <SelectTrigger className="bg-secondary border-border text-foreground">
+                  <SelectValue placeholder="Choose location" />
+                </SelectTrigger>
+                <SelectContent>
+                  {locationOptions.map((location) => (
+                    <SelectItem key={location.id} value={location.id}>
+                      {location.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-2">
@@ -343,18 +438,18 @@ export function AddContentDialog() {
               <Button
                 className="w-full bg-accent text-accent-foreground hover:bg-accent/90"
                 onClick={() => void handlePickOnMapAndAdd()}
-                disabled={!placeData.name.trim()}
+                disabled={!placeData.name.trim() || submittingPlace}
               >
                 <MapPin className="size-4 mr-2" />
-                Pick on Map and Add
+                {submittingPlace ? "Submitting..." : "Pick on Map and Add"}
               </Button>
               <Button 
                 variant="outline"
                 className="w-full"
-                onClick={handleAddPlace}
-                disabled={!placeData.name.trim()}
+                onClick={() => void handleAddPlace()}
+                disabled={!placeData.name.trim() || submittingPlace}
               >
-                Add Using Coordinates
+                {submittingPlace ? "Submitting..." : "Add Using Coordinates"}
               </Button>
             </div>
           </TabsContent>

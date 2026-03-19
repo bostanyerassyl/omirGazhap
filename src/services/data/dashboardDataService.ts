@@ -31,7 +31,12 @@ import type {
   CitizenRequestStatus,
   ConstructionObject,
   DashboardData,
+  DashboardAppeal,
   DashboardEvent,
+  DashboardLocationOption,
+  DashboardMapMarker,
+  DashboardNewsItem,
+  DashboardSituation,
   FeatureRequest,
   IndustrialistEmissionsData,
   IndustrialistFinancesData,
@@ -80,6 +85,11 @@ function createEmptyDashboardData(): DashboardData {
   return {
     dashboard: {
       events: [],
+      appeals: [],
+      news: [],
+      situations: [],
+      locationOptions: [],
+      mapMarkers: [],
     },
     developer: {
       objects: [],
@@ -337,6 +347,167 @@ function buildDashboardEvents(events: EventItem[]): DashboardEvent[] {
       location: event.locationName ?? 'Alatau Smart City',
     }
   })
+}
+
+function buildDashboardAppeals(
+  cases: CaseItem[],
+  events: EventItem[],
+): DashboardAppeal[] {
+  return cases.slice(0, 12).map((item) => {
+    const relatedEvent = events.find((event) => event.id === item.eventId)
+
+    return {
+      id: item.id,
+      category: relatedEvent?.eventType ?? item.assignedRole ?? 'general',
+      message:
+        relatedEvent?.description ||
+        `Appeal assigned to ${item.assignedRole ?? 'unassigned'} role.`,
+      date: formatTimestamp(item.createdAt),
+      status:
+        item.status === 'resolved' || item.status === 'closed'
+          ? 'resolved'
+          : item.status === 'in_progress'
+            ? 'in-progress'
+            : 'pending',
+    }
+  })
+}
+
+function buildDashboardNews(events: EventItem[]): DashboardNewsItem[] {
+  return events.slice(0, 8).map((item) => ({
+    id: item.id,
+    title: item.title,
+    summary: item.description || `${item.eventType} update from Alatau Smart City.`,
+    date: formatTimestamp(item.createdAt),
+    category: item.eventType.replace(/_/g, ' '),
+  }))
+}
+
+function buildDashboardSituations(
+  events: EventItem[],
+  cases: CaseItem[],
+): DashboardSituation[] {
+  return events
+    .filter((item) => item.severity !== 'low')
+    .slice(0, 8)
+    .map((item) => {
+      const relatedCase = cases.find((currentCase) => currentCase.eventId === item.id)
+
+      return {
+        id: item.id,
+        title: item.title,
+        description:
+          item.description ||
+          `Operational situation detected at ${item.locationName ?? 'Alatau Smart City'}.`,
+        severity:
+          item.severity === 'critical' || item.severity === 'high'
+            ? 'high'
+            : item.severity === 'medium'
+              ? 'medium'
+              : 'low',
+        date: formatTimestamp(relatedCase?.updatedAt || item.createdAt),
+      }
+    })
+}
+
+function buildDashboardLocationOptions(
+  locations: LocationItem[],
+): DashboardLocationOption[] {
+  return locations.map((location) => ({
+    id: location.id,
+    name: location.name,
+  }))
+}
+
+function buildDashboardMapMarkers(
+  locations: LocationItem[],
+  assets: AssetItem[],
+  events: EventItem[],
+  observations: ObservationItem[],
+): DashboardMapMarker[] {
+  const baseLayout = [
+    { x: 24, y: 28 },
+    { x: 62, y: 42 },
+    { x: 36, y: 56 },
+    { x: 74, y: 30 },
+    { x: 48, y: 66 },
+    { x: 18, y: 72 },
+  ]
+  const locationIndex = new Map(
+    locations.map((location, index) => [
+      location.id,
+      baseLayout[index % baseLayout.length],
+    ]),
+  )
+
+  const eventMarkers = events.slice(0, 6).map<DashboardMapMarker>((event, index) => {
+    const position =
+      (event.locationId && locationIndex.get(event.locationId)) ||
+      baseLayout[index % baseLayout.length]
+
+    return {
+      id: `event-${event.id}`,
+      type: 'event',
+      x: position.x,
+      y: position.y,
+      label: event.title,
+      details: {
+        title: event.title,
+        description: event.description,
+        eventDate: formatTimestamp(event.startsAt ?? event.createdAt),
+        status: event.severity,
+      },
+    }
+  })
+
+  const placeMarkers = observations
+    .filter((item) => item.payload.category === 'community_place')
+    .slice(0, 6)
+    .map<DashboardMapMarker>((item, index) => {
+      const position =
+        (item.locationId && locationIndex.get(item.locationId)) ||
+        baseLayout[(index + 2) % baseLayout.length]
+      const name =
+        typeof item.payload.name === 'string' ? item.payload.name : `Place ${item.id.slice(0, 8)}`
+      const description =
+        typeof item.payload.description === 'string' ? item.payload.description : 'Community place suggestion'
+
+      return {
+        id: `place-${item.id}`,
+        type: 'place',
+        x: position.x,
+        y: position.y,
+        label: name,
+        details: {
+          title: name,
+          description,
+          status: item.reviewStatus,
+        },
+      }
+    })
+
+  const buildingMarkers = assets.slice(0, 6).map<DashboardMapMarker>((asset, index) => {
+    const position =
+      (asset.locationId && locationIndex.get(asset.locationId)) ||
+      baseLayout[(index + 1) % baseLayout.length]
+    const title = asset.name || `${asset.type} object`
+
+    return {
+      id: `asset-${asset.id}`,
+      type: 'building',
+      x: position.x,
+      y: position.y,
+      label: title,
+      details: {
+        title,
+        description:
+          asset.description || `Tracked ${asset.type} object in Alatau Smart City.`,
+        status: asset.status,
+      },
+    }
+  })
+
+  return [...buildingMarkers, ...placeMarkers, ...eventMarkers].slice(0, 18)
 }
 
 function normalizeConstructionStatus(status: string): ConstructionObject['status'] {
@@ -1951,6 +2122,16 @@ async function buildDashboardData(
     data: {
       dashboard: {
         events: buildDashboardEvents(events),
+        appeals: buildDashboardAppeals(cases, events),
+        news: buildDashboardNews(events),
+        situations: buildDashboardSituations(events, cases),
+        locationOptions: buildDashboardLocationOptions(locations),
+        mapMarkers: buildDashboardMapMarkers(
+          locations,
+          assets,
+          events,
+          observations,
+        ),
       },
       developer: {
         objects: buildConstructionObjects(

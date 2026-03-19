@@ -25,7 +25,11 @@ const transportModes: { mode: TransportMode; icon: React.ReactNode; label: strin
   { mode: "transit", icon: <Bus className="size-4" />, label: "Transit" },
 ]
 
-export function RouteSearch() {
+interface RouteSearchProps {
+  suggestions?: string[]
+}
+
+export function RouteSearch({ suggestions = [] }: RouteSearchProps) {
   const [destination, setDestination] = useState("")
   const [selectedMode, setSelectedMode] = useState<TransportMode>("car")
   const [isListening, setIsListening] = useState(false)
@@ -74,6 +78,23 @@ export function RouteSearch() {
     clearMapRoute()
   }
 
+  const handleStartNavigation = () => {
+    if (!destination) {
+      return
+    }
+
+    const modeParam =
+      selectedMode === "car"
+        ? "driving"
+        : selectedMode === "walk"
+          ? "walking"
+          : selectedMode === "bike"
+            ? "bicycling"
+            : "transit"
+    const url = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destination)}&travelmode=${modeParam}`
+    window.open(url, "_blank", "noopener,noreferrer")
+  }
+
   return (
     <div className="absolute bottom-0 left-0 right-0 p-4 z-30">
       <div className="max-w-2xl mx-auto space-y-3">
@@ -105,7 +126,10 @@ export function RouteSearch() {
                 <p className="text-xs text-muted-foreground">traffic</p>
               </div>
             </div>
-            <Button className="w-full mt-3 bg-accent text-accent-foreground hover:bg-accent/90">
+            <Button
+              className="w-full mt-3 bg-accent text-accent-foreground hover:bg-accent/90"
+              onClick={handleStartNavigation}
+            >
               <Navigation className="size-4 mr-2" />
               Start Navigation
             </Button>
@@ -149,8 +173,14 @@ export function RouteSearch() {
               value={destination}
               onChange={(e) => setDestination(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+              list="dashboard-route-suggestions"
               className="border-0 bg-transparent text-foreground placeholder:text-muted-foreground focus-visible:ring-0 px-0"
             />
+            <datalist id="dashboard-route-suggestions">
+              {suggestions.map((suggestion) => (
+                <option key={suggestion} value={suggestion} />
+              ))}
+            </datalist>
             {destination && (
               <Button
                 variant="ghost"

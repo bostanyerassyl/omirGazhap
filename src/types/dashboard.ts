@@ -35,6 +35,49 @@ export type DashboardEvent = {
   location: string
 }
 
+export type DashboardAppeal = {
+  id: string
+  category: string
+  message: string
+  date: string
+  status: 'pending' | 'in-progress' | 'resolved'
+}
+
+export type DashboardNewsItem = {
+  id: string
+  title: string
+  summary: string
+  date: string
+  category: string
+}
+
+export type DashboardSituation = {
+  id: string
+  title: string
+  description: string
+  severity: 'low' | 'medium' | 'high'
+  date: string
+}
+
+export type DashboardLocationOption = {
+  id: string
+  name: string
+}
+
+export type DashboardMapMarker = {
+  id: string
+  type: 'building' | 'event' | 'place'
+  x: number
+  y: number
+  label: string
+  details?: {
+    title?: string
+    description?: string
+    status?: string
+    eventDate?: string
+  }
+}
+
 export type AkimatQuickStat = {
   label: string
   value: string
@@ -422,6 +465,11 @@ export type UtilitiesReportTarget = {
 export type DashboardData = {
   dashboard: {
     events: DashboardEvent[]
+    appeals: DashboardAppeal[]
+    news: DashboardNewsItem[]
+    situations: DashboardSituation[]
+    locationOptions: DashboardLocationOption[]
+    mapMarkers: DashboardMapMarker[]
   }
   developer: {
     objects: ConstructionObject[]

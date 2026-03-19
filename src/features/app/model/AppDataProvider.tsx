@@ -29,6 +29,17 @@ type AppDataContextValue = {
   loading: boolean
   error: string | null
   reloadData: () => Promise<void>
+  submitDashboardAppeal: (payload: {
+    category: string
+    message: string
+    locationId?: string | null
+  }) => Promise<AuthResult<null>>
+  addDashboardPlace: (payload: {
+    name: string
+    description: string
+    locationId?: string | null
+    photosCount?: number
+  }) => Promise<AuthResult<null>>
   saveDeveloperObject: (object: ConstructionObject) => Promise<AuthResult<ConstructionObject>>
   createDeveloperObject: (object: ConstructionObject) => Promise<AuthResult<ConstructionObject>>
   reportDeveloperObject: (payload: {
@@ -106,6 +117,90 @@ export function AppDataProvider({ children }: PropsWithChildren) {
       loading,
       error,
       reloadData: loadData,
+      async submitDashboardAppeal({ category, message, locationId }) {
+        if (!user) {
+          return {
+            data: null,
+            error: new Error('User is not authenticated'),
+          }
+        }
+
+        const title = `${category} appeal`
+        const eventResult = await eventService.create({
+          locationId: locationId ?? null,
+          createdBy: user.id,
+          title,
+          description: message,
+          eventType: category.toLowerCase(),
+          severity: 2,
+          startsAt: new Date().toISOString(),
+          isPublic: true,
+        })
+
+        if (eventResult.error || !eventResult.data) {
+          return {
+            data: null,
+            error: eventResult.error ?? new Error('Unable to create appeal event'),
+          }
+        }
+
+        const caseResult = await caseService.create({
+          eventId: eventResult.data.id,
+          createdBy: user.id,
+          assignedRole: 'akimat',
+          status: 'open',
+          priority: 'medium',
+          visibility: 'public',
+        })
+
+        if (caseResult.error) {
+          return {
+            data: null,
+            error: caseResult.error,
+          }
+        }
+
+        await loadData()
+
+        return {
+          data: null,
+          error: null,
+        }
+      },
+      async addDashboardPlace({ name, description, locationId, photosCount }) {
+        if (!user) {
+          return {
+            data: null,
+            error: new Error('User is not authenticated'),
+          }
+        }
+
+        const observationResult = await observationService.create({
+          locationId: locationId ?? null,
+          createdBy: user.id,
+          payload: {
+            category: 'community_place',
+            name,
+            description,
+            photos_count: photosCount ?? 0,
+          },
+          reviewStatus: 'pending',
+        })
+
+        if (observationResult.error) {
+          return {
+            data: null,
+            error: observationResult.error,
+          }
+        }
+
+        await loadData()
+
+        return {
+          data: null,
+          error: null,
+        }
+      },
       async saveDeveloperObject(object) {
         const result = await assetService.update(object.id, {
           locationId: object.locationId,

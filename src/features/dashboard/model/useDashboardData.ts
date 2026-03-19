@@ -11,6 +11,8 @@ export function useDashboardData<K extends keyof DashboardData>(section: K) {
       loading: context.loading,
       error: context.error,
       reloadData: context.reloadData,
+      submitDashboardAppeal: context.submitDashboardAppeal,
+      addDashboardPlace: context.addDashboardPlace,
       saveDeveloperObject: context.saveDeveloperObject,
       createDeveloperObject: context.createDeveloperObject,
       reportDeveloperObject: context.reportDeveloperObject,
