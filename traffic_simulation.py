@@ -12,152 +12,153 @@ SUPABASE_KEY = 'sb_publishable_RzNSGBsRw82CiiLcFkJJhg_gcEJLRvy'
 
 def setup_intersection(supabase: Client):
     """
-    БЛОК 1. ИНИЦИАЛИЗАЦИЯ ИНФРАСТРУКТУРЫ: Строим полноценный перекресток
+    БЛОК 1. ИНИЦИАЛИЗАЦИЯ ИНФРАСТРУКТУРЫ: Строим полноценный перекресток (4 светофора)
     """
-    logging.info("=== БЛОК 1: Создание перекрестка ===")
+    logging.info("=== БЛОК 1: Создание перекрестка (4 сигнала) ===")
     
-    # 1. Ассеты: 2 камеры (для каждой дороги) и 1 светофор
+    # 1. Ассеты: 2 камеры и 4 светофора
     cam_ns = supabase.table("assets").insert({"type": "traffic_camera", "status": "active"}).execute().data[0]['id']
     cam_ew = supabase.table("assets").insert({"type": "traffic_camera", "status": "active"}).execute().data[0]['id']
-    t_light = supabase.table("assets").insert({"type": "traffic_light", "status": "active"}).execute().data[0]['id']
     
-    # 2. Дорога Север-Юг (Вертикальная линия)
+    # Создаем 4 актива для светофоров
+    light_n = supabase.table("assets").insert({"type": "traffic_light", "status": "active"}).execute().data[0]['id']
+    light_s = supabase.table("assets").insert({"type": "traffic_light", "status": "active"}).execute().data[0]['id']
+    light_e = supabase.table("assets").insert({"type": "traffic_light", "status": "active"}).execute().data[0]['id']
+    light_w = supabase.table("assets").insert({"type": "traffic_light", "status": "active"}).execute().data[0]['id']
+    
+    center_lon, center_lat = 77.1100, 43.6730
+    offset = 0.00015 # Небольшой отступ от центра для иконок
+
+    # 2. Дороги (LineStrings)
     road_ns_id = str(uuid.uuid4())
     supabase.table("Map Features").insert({
-        "id": road_ns_id, # Использовать ранее созданный UUID
+        "id": road_ns_id,
         "type": "LineString",
-        "geometry": {
-            "type": "LineString",
-            # Вертикально пересекает 43.6730
-            "coordinates": [[77.1100, 43.6740], [77.1100, 43.6720]] 
-        },
+        "geometry": {"type": "LineString", "coordinates": [[center_lon, center_lat + 0.001], [center_lon, center_lat - 0.001]]},
         "color": "green",
         "title": "Улица Север-Юг",
         "asset_id": cam_ns
     }).execute()
     
-    # 3. Дорога Запад-Восток (Горизонтальная линия)
     road_ew_id = str(uuid.uuid4())
     supabase.table("Map Features").insert({
-        "id": road_ew_id, # Создаем UUID для фичи
+        "id": road_ew_id,
         "type": "LineString",
-        "geometry": {
-            "type": "LineString",
-            # Горизонтально пересекает 77.1100
-            "coordinates": [[77.1090, 43.6730], [77.1110, 43.6730]]
-        },
+        "geometry": {"type": "LineString", "coordinates": [[center_lon - 0.001, center_lat], [center_lon + 0.001, center_lat]]},
         "color": "red",
         "title": "Улица Запад-Восток",
         "asset_id": cam_ew
     }).execute()
     
-    # 4. Светофор в точном центре перекрестка
-    light_map_id = str(uuid.uuid4())
-    supabase.table("Map Features").insert({
-        "id": light_map_id,
-        "type": "Point",
-        "geometry": {
-            "type": "Point",
-            "coordinates": [77.1100, 43.6730] # Точка пересечения двух дорог
+    # 3. Камеры на карте (Точки)
+    supabase.table("Map Features").insert([
+        {
+            "id": str(uuid.uuid4()), "type": "Point", "asset_id": cam_ns,
+            "geometry": {"type": "Point", "coordinates": [center_lon, center_lat + 0.0005]},
+            "title": "Камера (С-Ю)", "icon": "📹"
         },
-        "color": "yellow", # Желтый маркер светофора
-        "title": "Умный перекресток",
-        "asset_id": t_light
-    }).execute()
-    
-    logging.info("Перекресток и 3 ассета успешно загружены на карту!")
-    return cam_ns, cam_ew, t_light, road_ns_id, road_ew_id
+        {
+            "id": str(uuid.uuid4()), "type": "Point", "asset_id": cam_ew,
+            "geometry": {"type": "Point", "coordinates": [center_lon + 0.0005, center_lat]},
+            "title": "Камера (З-В)", "icon": "📹"
+        }
+    ]).execute()
 
-async def run_traffic_loop(supabase: Client, cam_ns, cam_ew, t_light, road_ns_id, road_ew_id):
-    """
-    БЛОК 2. АНАЛИЗАТОР ТРАФИКА
-    Пишет показания в observations каждые 4 секунды.
-    Меняет цвет дорог в Map Features напрямую.
-    В events пишет только если пробка держится >= 2 шагов подряд.
-    """
-    logging.info("=== БЛОК 2: Запуск умного светофора ===")
+    # 4. СВЕТОФОРЫ: 4 точки вокруг центра
+    # Сохраняем ID фишек на карте для обновлений (через asset_id будем искать или вернем списком)
+    map_light_n = str(uuid.uuid4())
+    map_light_s = str(uuid.uuid4())
+    map_light_e = str(uuid.uuid4())
+    map_light_w = str(uuid.uuid4())
+
+    supabase.table("Map Features").insert([
+        {"id": map_light_n, "type": "Point", "asset_id": light_n, "icon": "🟡", "title": "Светофор Север", "geometry": {"type": "Point", "coordinates": [center_lon, center_lat + offset]}},
+        {"id": map_light_s, "type": "Point", "asset_id": light_s, "icon": "🟡", "title": "Светофор Юг", "geometry": {"type": "Point", "coordinates": [center_lon, center_lat - offset]}},
+        {"id": map_light_e, "type": "Point", "asset_id": light_e, "icon": "🟡", "title": "Светофор Восток", "geometry": {"type": "Point", "coordinates": [center_lon + offset, center_lat]}},
+        {"id": map_light_w, "type": "Point", "asset_id": light_w, "icon": "🟡", "title": "Светофор Запад", "geometry": {"type": "Point", "coordinates": [center_lon - offset, center_lat]}}
+    ]).execute()
     
-    JAM_THRESHOLD = 50 # Если машин больше - считаем затор
-    jam_counter = {"ns": 0, "ew": 0} # Счетчики продолжительности пробок
+    logging.info("Перекресток (4 светофора) успешно проинициализирован!")
+    return {
+        "cam_ns": cam_ns, "cam_ew": cam_ew,
+        "lights_ns": [light_n, light_s], "lights_ew": [light_e, light_w],
+        "map_lights_ns": [map_light_n, map_light_s], "map_lights_ew": [map_light_e, map_light_w],
+        "road_ns": road_ns_id, "road_ew": road_ew_id
+    }
+
+async def run_traffic_loop(supabase: Client, config: dict):
+    """
+    БЛОК 2. АНАЛИЗАТОР И УПРАВЛЕНИЕ: 4 светофора с динамическими иконками 🔴🟢
+    """
+    logging.info("=== БЛОК 2: Запуск цикла управления перекрестком ===")
+    jam_counter = {"ns": 0, "ew": 0}
     
     while True:
         try:
-            # Генерация машин на двух направлениях
             cars_ns = random.randint(10, 80)
             cars_ew = random.randint(10, 80)
             
-            # 1. ОБЕ КАМЕРЫ ПИШУТ ПОКАЗАНИЯ В OBSERVATIONS (Как обычные сенсоры)
+            # 1. Observations от камер
             supabase.table("observations").insert([
-                {"asset_id": cam_ns, "payload": {"car_count": cars_ns, "direction": "North-South"}},
-                {"asset_id": cam_ew, "payload": {"car_count": cars_ew, "direction": "East-West"}}
+                {"asset_id": config["cam_ns"], "payload": {"car_count": cars_ns, "dir": "NS"}},
+                {"asset_id": config["cam_ew"], "payload": {"car_count": cars_ew, "dir": "EW"}}
             ]).execute()
 
-            # 2. ЛОГИКА АДАПТИВНОГО СВЕТОФОРА (Динамические цвета)
-            # У кого больше машин, тому даем зеленый свет, другому - красный
-            if cars_ns >= cars_ew:
-                phase_ns, phase_ew = "green", "red"
-                # Обновляем напрямую цвета в базе
-                supabase.table("Map Features").update({"color": "green"}).eq("id", road_ns_id).execute()
-                supabase.table("Map Features").update({"color": "red"}).eq("id", road_ew_id).execute()
-            else:
-                phase_ns, phase_ew = "red", "green"
-                supabase.table("Map Features").update({"color": "red"}).eq("id", road_ns_id).execute()
-                supabase.table("Map Features").update({"color": "green"}).eq("id", road_ew_id).execute()
-                
-            # 3. САМ СВЕТОФОР ПИШЕТ В СВОИ OBSERVATIONS (Его текущая фаза)
-            supabase.table("observations").insert({
-                "asset_id": t_light,
-                "payload": {"phase_ns": phase_ns, "phase_ew": phase_ew}
-            }).execute()
+            # 2. ЛОГИКА АДАПТАЦИИ
+            ns_is_green = cars_ns >= cars_ew
             
-            # 4. ЛОГИКА ИНЦИДЕНТОВ (Только если пробка держится несколько шагов)
-            # Для дороги Север-Юг
-            if cars_ns >= JAM_THRESHOLD:
-                jam_counter["ns"] += 1
-                if jam_counter["ns"] == 2: # Пробка второй такт подряд
-                    supabase.table("events").insert({
-                        "severity": 3, "event_type": "traffic_jam", "asset_id": cam_ns,
-                        "description": f"Продолжительный затор (С-Ю). Машин в потоке: {cars_ns}"
-                    }).execute()
-                    logging.warning("Сгенерирован EVENT (Пробка Север-Юг)!")
-            else:
-                jam_counter["ns"] = 0 # Сброс, пробка рассосалась
-                
-            # Для дороги Запад-Восток
-            if cars_ew >= JAM_THRESHOLD:
-                jam_counter["ew"] += 1
-                if jam_counter["ew"] == 2: # Пробка второй такт подряд
-                    supabase.table("events").insert({
-                        "severity": 3, "event_type": "traffic_jam", "asset_id": cam_ew,
-                        "description": f"Продолжительный затор (З-В). Машин в потоке: {cars_ew}"
-                    }).execute()
-                    logging.warning("Сгенерирован EVENT (Пробка Запад-Восток)!")
-            else:
-                jam_counter["ew"] = 0 # Сброс
-                
-            logging.info(f"Такт [NS: {cars_ns} машин -> {phase_ns.upper()}] | [EW: {cars_ew} машин -> {phase_ew.upper()}]")
+            # Цвета дорог
+            supabase.table("Map Features").update({"color": "green" if ns_is_green else "red"}).eq("id", config["road_ns"]).execute()
+            supabase.table("Map Features").update({"color": "red" if ns_is_green else "green"}).eq("id", config["road_ew"]).execute()
+            
+            # Цвета икон светофоров (🔴 / 🟢)
+            ns_icon = "🟢" if ns_is_green else "🔴"
+            ew_icon = "🔴" if ns_is_green else "🟢"
+            
+            # Массовое обновление иконок на карте
+            for map_id in config["map_lights_ns"]:
+                supabase.table("Map Features").update({"icon": ns_icon}).eq("id", map_id).execute()
+            for map_id in config["map_lights_ew"]:
+                supabase.table("Map Features").update({"icon": ew_icon}).eq("id", map_id).execute()
+            
+            # 3. Observations от самих светофоров
+            light_obs = []
+            for asset_id in config["lights_ns"]:
+                light_obs.append({"asset_id": asset_id, "payload": {"status": "green" if ns_is_green else "red"}})
+            for asset_id in config["lights_ew"]:
+                light_obs.append({"asset_id": asset_id, "payload": {"status": "red" if ns_is_green else "green"}})
+            supabase.table("observations").insert(light_obs).execute()
+
+            # 4. Events (затяжная пробка)
+            for key, val in [("ns", cars_ns), ("ew", cars_ew)]:
+                if val >= 60:
+                    jam_counter[key] += 1
+                    if jam_counter[key] >= 2:
+                        supabase.table("events").insert({
+                            "severity": 3, "event_type": "traffic_jam",
+                            "asset_id": config[f"cam_{key}"],
+                            "description": f"Критический затор на {key.upper()}. Поток: {val}"
+                        }).execute()
+                else:
+                    jam_counter[key] = 0
+
+            logging.info(f"Update: NS [{cars_ns} c] -> {ns_icon} | EW [{cars_ew} c] -> {ew_icon}")
             
         except Exception as e:
-            logging.error(f"Ошибка в цикле трафика: {e} (Перезапуск через 4 сек...)")
+            logging.error(f"Error in cycle: {e}")
             
         await asyncio.sleep(4)
 
 async def main():
     try:
-        logging.info("Подключение к Supabase...")
         supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-        
-        # Блок 1
-        cam_ns, cam_ew, t_light, road_ns_id, road_ew_id = setup_intersection(supabase)
-        
-        # Блок 2
-        await run_traffic_loop(supabase, cam_ns, cam_ew, t_light, road_ns_id, road_ew_id)
-        
+        config = setup_intersection(supabase)
+        await run_traffic_loop(supabase, config)
     except Exception as e:
-        logging.critical(f"Критическая ошибка: {e}")
+        logging.critical(f"FATAL: {e}")
 
 if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        logging.info("\nСимуляция трафика остановлена.")
+        logging.info("\nSimulation stopped.")
