@@ -11,11 +11,18 @@ import { toError } from '@/utils/error'
 import { supabase } from '../supabaseClient'
 
 function normalizeRole(role: ProfileDbRole | null): Role | null {
-  if (role === 'resident') {
-    return 'user'
+  switch (role) {
+    case 'resident':
+      return 'user'
+    case 'developer':
+    case 'industrialist':
+    case 'utilities':
+    case 'akimat':
+    case 'admin':
+      return role
+    default:
+      return null
   }
-
-  return role
 }
 
 function serializeRole(role: Role | null | undefined): ProfileDbRole | null | undefined {

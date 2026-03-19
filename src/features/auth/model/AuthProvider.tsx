@@ -122,6 +122,26 @@ async function hydrateProfile(
   }
 }
 
+function resolveAuthData(
+  result: AuthResult<AuthSessionData>,
+): AuthResult<AuthSessionData> {
+  if (result.error) {
+    return {
+      data: null,
+      error: result.error,
+    }
+  }
+
+  if (!result.data) {
+    return {
+      data: null,
+      error: new Error('Authentication did not return session data'),
+    }
+  }
+
+  return result
+}
+
 export function AuthProvider({ children }: PropsWithChildren) {
   const [state, setState] = useState<AuthState>({
     user: null,
@@ -133,7 +153,23 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const restoreSession = useCallback(async () => {
     setState((current) => ({ ...current, loading: true }))
     const authResult = await restoreAuthSession()
-    const result = await hydrateProfile(authResult.data)
+    const resolvedAuthResult = resolveAuthData(authResult)
+
+    if (resolvedAuthResult.error) {
+      setState({
+        user: null,
+        profile: null,
+        role: null,
+        loading: false,
+      })
+
+      return {
+        data: null,
+        error: resolvedAuthResult.error,
+      }
+    }
+
+    const result = await hydrateProfile(resolvedAuthResult.data)
 
     setState({
       ...mapAuthData(result.data),
@@ -145,7 +181,16 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   const login = useCallback(async (payload: SignInPayload) => {
     const authResult = await signIn(payload)
-    const result = await hydrateProfile(authResult.data)
+    const resolvedAuthResult = resolveAuthData(authResult)
+
+    if (resolvedAuthResult.error) {
+      return {
+        data: null,
+        error: resolvedAuthResult.error,
+      }
+    }
+
+    const result = await hydrateProfile(resolvedAuthResult.data)
 
     if (result.data) {
       setState(mapAuthData(result.data))
@@ -156,7 +201,16 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   const register = useCallback(async (payload: SignUpPayload) => {
     const authResult = await signUp(payload)
-    const result = await hydrateProfile(authResult.data, {
+    const resolvedAuthResult = resolveAuthData(authResult)
+
+    if (resolvedAuthResult.error) {
+      return {
+        data: null,
+        error: resolvedAuthResult.error,
+      }
+    }
+
+    const result = await hydrateProfile(resolvedAuthResult.data, {
       allowCreate: true,
       initialProfile: payload,
     })
