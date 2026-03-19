@@ -9,7 +9,9 @@ import {
 } from 'react'
 import { useAuth } from '@/features/auth/model/AuthProvider'
 import { adminService } from '@/services/domain/adminService'
+import { assetService } from '@/services/domain/assetService'
 import { caseService } from '@/services/domain/caseService'
+import { eventService } from '@/services/domain/eventService'
 import { getDashboardData } from '@/services/data/dashboardDataService'
 import { logger } from '@/services/logger'
 import type { AuthResult } from '@/types/auth'
@@ -26,7 +28,14 @@ type AppDataContextValue = {
   loading: boolean
   error: string | null
   reloadData: () => Promise<void>
-  updateDeveloperObject: (object: ConstructionObject) => void
+  saveDeveloperObject: (object: ConstructionObject) => Promise<AuthResult<ConstructionObject>>
+  createDeveloperObject: (object: ConstructionObject) => Promise<AuthResult<ConstructionObject>>
+  reportDeveloperObject: (payload: {
+    objectId: string
+    title: string
+    description: string
+    priority: 'low' | 'medium' | 'high'
+  }) => Promise<AuthResult<null>>
   updateAkimatRequestStatus: (
     id: string,
     status: CitizenRequestStatus,
@@ -75,22 +84,130 @@ export function AppDataProvider({ children }: PropsWithChildren) {
       loading,
       error,
       reloadData: loadData,
-      updateDeveloperObject(object) {
-        setData((current) => {
-          if (!current) {
-            return current
-          }
-
-          return {
-            ...current,
-            developer: {
-              ...current.developer,
-              objects: current.developer.objects.map((item) =>
-                item.id === object.id ? object : item,
-              ),
-            },
-          }
+      async saveDeveloperObject(object) {
+        const result = await assetService.update(object.id, {
+          locationId: object.locationId,
+          name: object.name,
+          address: object.address,
+          description: object.description,
+          contactPhone: object.contactPhone,
+          deadline: object.deadline || null,
+          progress: object.progress,
+          type: object.type,
+          status: object.status,
         })
+
+        if (result.error) {
+          return {
+            data: null,
+            error: result.error,
+          }
+        }
+
+        await loadData()
+
+        return {
+          data: object,
+          error: null,
+        }
+      },
+      async createDeveloperObject(object) {
+        if (!user) {
+          return {
+            data: null,
+            error: new Error('User is not authenticated'),
+          }
+        }
+
+        const result = await assetService.create({
+          locationId: object.locationId,
+          createdBy: user.id,
+          ownerProfileId: user.id,
+          ownerRole: 'developer',
+          name: object.name,
+          address: object.address,
+          description: object.description,
+          contactPhone: object.contactPhone,
+          deadline: object.deadline || null,
+          progress: object.progress,
+          type: object.type,
+          status: object.status,
+        })
+
+        if (result.error) {
+          return {
+            data: null,
+            error: result.error,
+          }
+        }
+
+        await loadData()
+
+        return {
+          data: object,
+          error: null,
+        }
+      },
+      async reportDeveloperObject({ objectId, title, description, priority }) {
+        if (!user) {
+          return {
+            data: null,
+            error: new Error('User is not authenticated'),
+          }
+        }
+
+        const asset = data?.developer.objects.find((item) => item.id === objectId)
+
+        if (!asset) {
+          return {
+            data: null,
+            error: new Error('Construction object was not found'),
+          }
+        }
+
+        const severity = priority === 'high' ? 3 : priority === 'medium' ? 2 : 1
+
+        const eventResult = await eventService.create({
+          assetId: asset.id,
+          locationId: asset.locationId,
+          createdBy: user.id,
+          title,
+          description,
+          eventType: 'construction',
+          severity,
+          startsAt: new Date().toISOString(),
+          isPublic: true,
+        })
+
+        if (eventResult.error || !eventResult.data) {
+          return {
+            data: null,
+            error: eventResult.error ?? new Error('Unable to create event'),
+          }
+        }
+
+        const caseResult = await caseService.create({
+          eventId: eventResult.data.id,
+          createdBy: user.id,
+          assignedRole: 'akimat',
+          status: 'open',
+          priority,
+          visibility: 'public',
+        })
+
+        if (caseResult.error) {
+          return {
+            data: null,
+            error: caseResult.error,
+          }
+        }
+
+        await loadData()
+
+        return {
+          data: null,
+          error: null,
+        }
       },
       async updateAkimatRequestStatus(id, status) {
         const nextStatus =
