@@ -1,11 +1,7 @@
-import Register from './pages/Register/Register'
+import AppRouter from './app/router/AppRouter'
 
 function App() {
-  if (window.location.pathname === '/register') {
-    return <Register />
-  }
-
-  return <div></div>
+  return <AppRouter />
 }
 
 export default App
