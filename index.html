@@ -1,23 +1,90 @@
 <!DOCTYPE html>
 <html>
+
 <head>
-  <meta charset="utf-8" />
-  <title>MapLibre Working</title>
-
-  <link href="https://unpkg.com/maplibre-gl@latest/dist/maplibre-gl.css" rel="stylesheet" />
-
-  <style>
-    body { margin: 0; }
-    #map { width: 100vw; height: 100vh; }
-  </style>
+    <meta charset="utf-8" />
+    <title>MapLibre</title>
+    <link href="https://unpkg.com/maplibre-gl@latest/dist/maplibre-gl.css" rel="stylesheet" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap"
+        rel="stylesheet" />
+    <link href="style/map.css" rel="stylesheet" />
 </head>
+
 <body>
+    <div id="map"></div>
 
-<div id="map"></div>
+    <div id="sidebar">
 
-<script src="https://unpkg.com/maplibre-gl@latest/dist/maplibre-gl.js"></script>
+        <div id="sidebar-banner">
+            <img id="banner-img" alt="Building banner" />
+            <div id="banner-placeholder">
+                <svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+                    <polyline points="9 22 9 12 15 12 15 22" />
+                </svg>
+                Click to add banner image
+            </div>
+            <button id="banner-remove">✕ Remove</button>
+            <input type="file" id="banner-upload" accept="image/*" />
+        </div>
 
-<script src="view/map.js"></script>
+        <div id="sidebar-header">
+            <div id="sidebar-header-text">
+                <div id="building-name">Building</div>
+                <div id="building-meta">—</div>
+            </div>
+            <button id="sidebar-close">✕</button>
+        </div>
 
+        <div id="sidebar-body">
+
+            <div class="section">
+                <div class="section-label">Description</div>
+                <textarea id="desc-textarea" placeholder="Add a description…"></textarea>
+            </div> <!-- .section -->
+
+            <div class="section">
+                <div class="section-label">Tags</div>
+                <div id="tags-container"></div>
+                <input id="tag-input" type="text" placeholder="Type a tag and press Enter…" />
+            </div> <!-- .section -->
+
+            <div class="section">
+                <div class="section-label">Properties</div>
+                <div class="section">
+                    <div class="section-label">Properties <span
+                            style="font-size:10px;color:var(--muted);font-weight:400;text-transform:none">(editable —
+                            saved per building)</span></div>
+                    <div class="prop-grid">
+                        <div class="prop-item">
+                            <div class="prop-key">Levels</div><input class="prop-val" id="prop-levels"
+                                placeholder="—" />
+                        </div>
+                        <div class="prop-item">
+                            <div class="prop-key">Type</div><input class="prop-val" id="prop-type" placeholder="—" />
+                        </div>
+                        <div class="prop-item">
+                            <div class="prop-key">Roof</div><input class="prop-val" id="prop-roof" placeholder="—" />
+                        </div>
+                        <div class="prop-item">
+                            <div class="prop-key">Min Height</div><input class="prop-val" id="prop-minheight"
+                                placeholder="—" />
+                        </div>
+                    </div>
+                </div>
+            </div> <!-- .section -->
+
+        </div> <!-- #sidebar-body -->
+
+        <div id="sidebar-footer">
+            <button id="btn-save">Save changes</button>
+        </div> <!-- #sidebar-footer -->
+
+    </div> <!-- #sidebar -->
+
+    <script src="https://unpkg.com/maplibre-gl@latest/dist/maplibre-gl.js"></script>
+    <script src="view/map.js"></script>
 </body>
+
 </html>
