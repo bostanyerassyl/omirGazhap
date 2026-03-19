@@ -35,7 +35,7 @@ def setup_intersection(supabase: Client):
         "id": road_ns_id,
         "type": "LineString",
         "geometry": {"type": "LineString", "coordinates": [[center_lon, center_lat + 0.001], [center_lon, center_lat - 0.001]]},
-        "color": "green",
+        "color": "#22c55e",
         "title": "Улица Север-Юг"
     }).execute()
     
@@ -44,7 +44,7 @@ def setup_intersection(supabase: Client):
         "id": road_ew_id,
         "type": "LineString",
         "geometry": {"type": "LineString", "coordinates": [[center_lon - 0.001, center_lat], [center_lon + 0.001, center_lat]]},
-        "color": "red",
+        "color": "#ef4444",
         "title": "Улица Запад-Восток"
     }).execute()
     
@@ -102,22 +102,24 @@ async def run_traffic_loop(supabase: Client, config: dict):
                 {"asset_id": config["cam_ew"], "payload": {"car_count": cars_ew, "dir": "EW"}}
             ]).execute()
 
-            # 2. ЛОГИКА АДАПТАЦИИ
+            # 2. АЛЬТЕРНАТИВНАЯ ЛОГИКА АДАПТАЦИИ (Через traffic_lights, чтобы обойти ошибку вебсокета)
             ns_is_green = cars_ns >= cars_ew
             
-            # Цвета дорог
-            supabase.table("Map Features").update({"color": "green" if ns_is_green else "red"}).eq("id", config["road_ns"]).execute()
-            supabase.table("Map Features").update({"color": "red" if ns_is_green else "green"}).eq("id", config["road_ew"]).execute()
+            traffic_state_ns = "green" if ns_is_green else "red"
+            traffic_state_ew = "red" if ns_is_green else "green"
             
-            # Цвета икон светофоров (🔴 / 🟢)
-            ns_icon = "🟢" if ns_is_green else "🔴"
-            ew_icon = "🔴" if ns_is_green else "🟢"
-            
-            # Массовое обновление иконок на карте
+            # Собираем массив обновлений стейтов для всех точек и дорог
+            upserts = [
+                {"feature_id": config["road_ns"], "state": traffic_state_ns},
+                {"feature_id": config["road_ew"], "state": traffic_state_ew}
+            ]
             for map_id in config["map_lights_ns"]:
-                supabase.table("Map Features").update({"icon": ns_icon}).eq("id", map_id).execute()
+                upserts.append({"feature_id": map_id, "state": traffic_state_ns})
             for map_id in config["map_lights_ew"]:
-                supabase.table("Map Features").update({"icon": ew_icon}).eq("id", map_id).execute()
+                upserts.append({"feature_id": map_id, "state": traffic_state_ew})
+                
+            # Массовый апдейт (фронтенд сразу словит это по вебсокету traffic_lights и перекрасит карту + иконки)
+            supabase.table("traffic_lights").upsert(upserts, on_conflict="feature_id").execute()
             
             # 3. Observations от самих светофоров
             light_obs = []
@@ -140,7 +142,7 @@ async def run_traffic_loop(supabase: Client, config: dict):
                 else:
                     jam_counter[key] = 0
 
-            logging.info(f"Update: NS [{cars_ns} c] -> {ns_icon} | EW [{cars_ew} c] -> {ew_icon}")
+            logging.info(f"Update: NS [{cars_ns} c] -> {traffic_state_ns.upper()} | EW [{cars_ew} c] -> {traffic_state_ew.upper()}")
             
         except Exception as e:
             logging.error(f"Error in cycle: {e}")

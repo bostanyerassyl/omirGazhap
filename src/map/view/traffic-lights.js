@@ -1,4 +1,5 @@
 import { supabase } from '../supabase.js';
+import { updateIconMarker } from './features.js';
 
 const STATE_TO_COLOR = {
   red: '#ef4444',
@@ -39,6 +40,16 @@ function applyStateLocal(featureId, state) {
 
   safeSetFeatureProperty(drawRef, feature.id, 'color', color);
   safeSetFeatureProperty(drawRef, feature.id, 'traffic_light_state', state);
+  
+  // Custom Icon logic for points
+  if (feature.geometry?.type === 'Point') {
+    const icon = state === 'red' ? '🔴' : state === 'green' ? '🟢' : '🟡';
+    safeSetFeatureProperty(drawRef, feature.id, 'icon', icon);
+    if (mapRef) {
+      updateIconMarker(mapRef, feature.id, feature.geometry.coordinates, icon, null);
+    }
+  }
+
   mapRef?.triggerRepaint();
 }
 
