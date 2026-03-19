@@ -28,6 +28,7 @@ import { ScopeSelector } from "@/components/utilities/scope-selector"
 import { StatsCards } from "@/components/utilities/stats-cards"
 import { AIEventsPanel } from "@/components/utilities/ai-events-panel"
 import { UtilitiesMap } from "@/components/utilities/utilities-map"
+import { UtilitiesProfileSheet } from "@/components/utilities/utilities-profile-sheet"
 import { useAuth } from "@/features/auth/model/AuthProvider"
 import { useDashboardData } from "@/features/dashboard/model/useDashboardData"
 import { cn } from "@/utils/cn"
@@ -41,7 +42,8 @@ export default function UtilitiesPage() {
   const [chartType, setChartType] = useState<"area" | "bar" | "line">("area")
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [reportSent, setReportSent] = useState(false)
-  const { logout } = useAuth()
+  const [isProfileOpen, setIsProfileOpen] = useState(false)
+  const { logout, profile } = useAuth()
   const { data, error, reloadData } = useDashboardData("utilities")
   const navigate = useNavigate()
 
@@ -80,6 +82,16 @@ export default function UtilitiesPage() {
     navigate("/login", { replace: true })
   }
 
+  const profileName = profile?.fullName || "Public Utilities"
+  const profileEmail = profile?.email || "admin@utilities.alatau.kz"
+  const profileAvatar = profile?.avatarUrl || ""
+  const profileInitials = profileName
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? "")
+    .join("") || "PU"
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -91,18 +103,18 @@ export default function UtilitiesPage() {
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="h-10 w-10 rounded-full p-0">
                   <Avatar className="h-10 w-10 border-2 border-accent">
-                    <AvatarImage src="" />
-                    <AvatarFallback className="bg-secondary text-foreground">PU</AvatarFallback>
+                    <AvatarImage src={profileAvatar} alt={profileName} />
+                    <AvatarFallback className="bg-secondary text-foreground">{profileInitials}</AvatarFallback>
                   </Avatar>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="w-56 bg-card border-border">
                 <div className="px-2 py-1.5">
-                  <p className="text-sm font-medium text-foreground">Public Utilities</p>
-                  <p className="text-xs text-muted-foreground">admin@utilities.alatau.kz</p>
+                  <p className="text-sm font-medium text-foreground">{profileName}</p>
+                  <p className="text-xs text-muted-foreground">{profileEmail}</p>
                 </div>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setIsProfileOpen(true)}>
                   <User className="w-4 h-4 mr-2" />
                   Profile Settings
                 </DropdownMenuItem>
@@ -286,9 +298,10 @@ export default function UtilitiesPage() {
           </>
         )}
       </main>
+
+      <UtilitiesProfileSheet open={isProfileOpen} onOpenChange={setIsProfileOpen} />
     </div>
   )
 }
-
 
 
