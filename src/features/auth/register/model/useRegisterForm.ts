@@ -87,6 +87,7 @@ function useRegisterForm() {
       [name]: undefined,
     }))
     setSubmitError(null)
+    setSubmitSuccess(null)
 
     setFormData((currentFormData) => ({
       ...currentFormData,

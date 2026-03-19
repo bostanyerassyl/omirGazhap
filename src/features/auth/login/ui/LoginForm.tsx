@@ -9,6 +9,7 @@ import {
   InputGroupAddon,
   InputGroupInput,
 } from '@/components/ui/input-group'
+import { StatusMessage } from '@/components/ui/status-message'
 import useLoginForm from '../model/useLoginForm'
 
 function LoginForm() {
@@ -36,14 +37,14 @@ function LoginForm() {
     >
       <form onSubmit={onSubmit} className="space-y-6">
         {successMessage ? (
-          <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">
+          <StatusMessage tone="success">
             {successMessage}
-          </div>
+          </StatusMessage>
         ) : null}
         {submitError ? (
-          <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+          <StatusMessage tone="error">
             {submitError}
-          </div>
+          </StatusMessage>
         ) : null}
         <FieldGroup>
           <Field>

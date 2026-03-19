@@ -1,10 +1,9 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowRight, Eye, EyeOff, Lock, Mail, User, Users } from 'lucide-react'
 import { AuthLayout } from '@/components/auth/auth-layout'
 import { Button } from '@/components/ui/button'
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
-import useRegisterForm from '../model/useRegisterForm'
 import {
   InputGroup,
   InputGroupAddon,
@@ -17,6 +16,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { StatusMessage } from '@/components/ui/status-message'
+import useRegisterForm from '../model/useRegisterForm'
 
 function RegisterForm() {
   const {
@@ -46,14 +47,10 @@ function RegisterForm() {
     >
       <form onSubmit={onSubmit} className="space-y-6">
         {submitError ? (
-          <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
-            {submitError}
-          </div>
+          <StatusMessage tone="error">{submitError}</StatusMessage>
         ) : null}
         {submitSuccess ? (
-          <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">
-            {submitSuccess}
-          </div>
+          <StatusMessage tone="success">{submitSuccess}</StatusMessage>
         ) : null}
         <FieldGroup>
           <Field>
@@ -139,7 +136,7 @@ function RegisterForm() {
           <Field>
             <FieldLabel htmlFor="role">Select role</FieldLabel>
             <div className="relative">
-              <div className="absolute left-3 top-1/2 -translate-y-1/2 z-10 pointer-events-none">
+              <div className="absolute left-3 top-1/2 z-10 -translate-y-1/2 pointer-events-none">
                 <Users className="h-4 w-4 text-muted-foreground" />
               </div>
               <Select
@@ -152,7 +149,7 @@ function RegisterForm() {
               >
                 <SelectTrigger
                   id="role"
-                  className="w-full pl-10 h-10 bg-input border-border"
+                  className="h-10 w-full border-border bg-input pl-10"
                 >
                   <SelectValue placeholder="Select your role" />
                 </SelectTrigger>
@@ -172,12 +169,12 @@ function RegisterForm() {
 
         <Button
           type="submit"
-          className="w-full h-11 bg-primary text-primary-foreground hover:bg-primary/90"
+          className="h-11 w-full bg-primary text-primary-foreground hover:bg-primary/90"
           disabled={isLoading}
         >
           {isLoading ? (
             <span className="flex items-center gap-2">
-              <span className="h-4 w-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
+              <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground/30 border-t-primary-foreground" />
               Creating account...
             </span>
           ) : (
@@ -192,7 +189,7 @@ function RegisterForm() {
           Already have an account?{' '}
           <Link
             to="/login"
-            className="text-accent hover:underline underline-offset-4 transition-colors"
+            className="text-accent transition-colors hover:underline underline-offset-4"
           >
             Sign in
           </Link>
@@ -203,3 +200,4 @@ function RegisterForm() {
 }
 
 export default RegisterForm
+

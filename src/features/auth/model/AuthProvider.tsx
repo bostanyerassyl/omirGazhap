@@ -15,12 +15,12 @@ import type {
 } from '@/types/auth'
 import type { ProfileUpdateInput } from '@/types/profile'
 import {
-  persistAuthSnapshot,
   restoreSession as restoreAuthSession,
   signIn,
   signOut,
   signUp,
   subscribeToAuthChanges,
+  updateAuthEmail,
   type SignInPayload,
   type SignUpPayload,
 } from '@/services/api/authService'
@@ -36,6 +36,7 @@ type AuthContextValue = AuthState & {
   logout: () => Promise<AuthResult<null>>
   restoreSession: () => Promise<AuthResult<AuthHydratedSessionData>>
   updateProfile: (data: ProfileUpdateInput) => Promise<AuthResult<AuthHydratedSessionData>>
+  updateEmail: (email: string) => Promise<AuthResult<AuthHydratedSessionData>>
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -73,8 +74,6 @@ async function hydrateProfile(
   const profileResult = await getProfile(data.user.id)
 
   if (!profileResult.error) {
-    persistAuthSnapshot(data.user, profileResult.data?.role ?? null)
-
     return {
       data: {
         ...data,
@@ -114,8 +113,6 @@ async function hydrateProfile(
     }
   }
 
-  persistAuthSnapshot(data.user, createdProfile.data?.role ?? null)
-
   return {
     data: {
       ...data,
@@ -123,6 +120,26 @@ async function hydrateProfile(
     },
     error: null,
   }
+}
+
+function resolveAuthData(
+  result: AuthResult<AuthSessionData>,
+): AuthResult<AuthSessionData> {
+  if (result.error) {
+    return {
+      data: null,
+      error: result.error,
+    }
+  }
+
+  if (!result.data) {
+    return {
+      data: null,
+      error: new Error('Authentication did not return session data'),
+    }
+  }
+
+  return result
 }
 
 export function AuthProvider({ children }: PropsWithChildren) {
@@ -136,7 +153,23 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const restoreSession = useCallback(async () => {
     setState((current) => ({ ...current, loading: true }))
     const authResult = await restoreAuthSession()
-    const result = await hydrateProfile(authResult.data)
+    const resolvedAuthResult = resolveAuthData(authResult)
+
+    if (resolvedAuthResult.error) {
+      setState({
+        user: null,
+        profile: null,
+        role: null,
+        loading: false,
+      })
+
+      return {
+        data: null,
+        error: resolvedAuthResult.error,
+      }
+    }
+
+    const result = await hydrateProfile(resolvedAuthResult.data)
 
     setState({
       ...mapAuthData(result.data),
@@ -148,7 +181,16 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   const login = useCallback(async (payload: SignInPayload) => {
     const authResult = await signIn(payload)
-    const result = await hydrateProfile(authResult.data)
+    const resolvedAuthResult = resolveAuthData(authResult)
+
+    if (resolvedAuthResult.error) {
+      return {
+        data: null,
+        error: resolvedAuthResult.error,
+      }
+    }
+
+    const result = await hydrateProfile(resolvedAuthResult.data)
 
     if (result.data) {
       setState(mapAuthData(result.data))
@@ -159,7 +201,16 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   const register = useCallback(async (payload: SignUpPayload) => {
     const authResult = await signUp(payload)
-    const result = await hydrateProfile(authResult.data, {
+    const resolvedAuthResult = resolveAuthData(authResult)
+
+    if (resolvedAuthResult.error) {
+      return {
+        data: null,
+        error: resolvedAuthResult.error,
+      }
+    }
+
+    const result = await hydrateProfile(resolvedAuthResult.data, {
       allowCreate: true,
       initialProfile: payload,
     })
@@ -204,8 +255,6 @@ export function AuthProvider({ children }: PropsWithChildren) {
         }
       }
 
-      persistAuthSnapshot(state.user, result.data?.role ?? null)
-
       const nextState = {
         session: null,
         user: state.user,
@@ -225,6 +274,50 @@ export function AuthProvider({ children }: PropsWithChildren) {
       }
     },
     [state.user],
+  )
+
+  const updateEmail = useCallback(
+    async (email: string) => {
+      if (!state.user) {
+        return {
+          data: null,
+          error: new Error('User is not authenticated'),
+        }
+      }
+
+      const emailResult = await updateAuthEmail(email)
+
+      if (emailResult.error) {
+        return {
+          data: null,
+          error: emailResult.error,
+        }
+      }
+
+      const profileResult = await getProfile(state.user.id)
+      const nextUser = emailResult.data ?? state.user
+      const nextProfile =
+        profileResult.error || !profileResult.data
+          ? state.profile
+          : profileResult.data
+
+      setState({
+        user: nextUser,
+        profile: nextProfile,
+        role: nextProfile?.role ?? null,
+        loading: false,
+      })
+
+      return {
+        data: {
+          session: null,
+          user: nextUser,
+          profile: nextProfile,
+        },
+        error: null,
+      }
+    },
+    [state.profile, state.user],
   )
 
   useEffect(() => {
@@ -252,8 +345,9 @@ export function AuthProvider({ children }: PropsWithChildren) {
       logout,
       restoreSession,
       updateProfile,
+      updateEmail,
     }),
-    [login, logout, register, restoreSession, state, updateProfile],
+    [login, logout, register, restoreSession, state, updateEmail, updateProfile],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
