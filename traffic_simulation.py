@@ -24,7 +24,7 @@ def setup_intersection(supabase: Client):
     # 2. Дорога Север-Юг (Вертикальная линия)
     road_ns_id = str(uuid.uuid4())
     supabase.table("Map Features").insert({
-        "id": road_map_id := str(uuid.uuid4()), # Создаем UUID для фичи
+        "id": road_ns_id, # Использовать ранее созданный UUID
         "type": "LineString",
         "geometry": {
             "type": "LineString",
@@ -66,7 +66,7 @@ def setup_intersection(supabase: Client):
     }).execute()
     
     logging.info("Перекресток и 3 ассета успешно загружены на карту!")
-    return cam_ns, cam_ew, t_light, road_map_id, road_ew_id
+    return cam_ns, cam_ew, t_light, road_ns_id, road_ew_id
 
 async def run_traffic_loop(supabase: Client, cam_ns, cam_ew, t_light, road_ns_id, road_ew_id):
     """
