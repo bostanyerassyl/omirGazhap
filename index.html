@@ -5,6 +5,8 @@
     <meta charset="utf-8" />
     <title>MapLibre</title>
     <link href="https://unpkg.com/maplibre-gl@latest/dist/maplibre-gl.css" rel="stylesheet" />
+    <link rel="stylesheet"
+        href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-draw/v1.4.3/mapbox-gl-draw.css" />
     <link
         href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap"
         rel="stylesheet" />
@@ -13,6 +15,17 @@
 
 <body>
     <div id="map"></div>
+
+    <div id="draw-toolbar" style="
+  position: fixed; top: 10px; left: 50%; transform: translateX(-50%);
+  display: flex; gap: 6px; z-index: 50;
+">
+        <button class="draw-btn" data-mode="simple_select">✋ Select</button>
+        <button class="draw-btn" data-mode="draw_point">📍 Point</button>
+        <button class="draw-btn" data-mode="draw_line_string">〰 Line</button>
+        <button class="draw-btn" data-mode="draw_polygon">⬠ Polygon</button>
+        <button id="draw-delete" style="background:#ef4444">🗑 Delete</button>
+    </div>
 
     <div id="sidebar">
 
@@ -31,60 +44,80 @@
 
         <div id="sidebar-header">
             <div id="sidebar-header-text">
-                <div id="building-name">Building</div>
+                <!-- Editable title — clicking turns it into an input -->
+                <div id="building-name" title="Click to edit">Building</div>
+                <input id="building-title-input" placeholder="Enter title…" style="display:none" />
                 <div id="building-meta">—</div>
             </div>
             <button id="sidebar-close">✕</button>
         </div>
 
         <div id="sidebar-body">
+            <div class="section" id="feature-section" style="display:none">
+                <div class="section-label">Feature</div>
+                <div class="prop-grid">
+                    <div class="prop-item" style="grid-column: span 2">
+                        <div class="prop-key">Title</div>
+                        <input class="prop-val" id="feature-title" placeholder="Name this feature…" />
+                    </div>
+                    <div class="prop-item" style="grid-column: span 2">
+                        <div class="prop-key">Color</div>
+                        <input type="color" id="feature-color" value="#e74c3c"
+                            style="width:100%;height:28px;border:none;background:none;cursor:pointer" />
+                    </div>
+                </div>
+                <textarea id="feature-desc" placeholder="Description…"
+                    style="margin-top:8px;width:100%;background:#0f1117;border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;padding:10px 12px;resize:vertical;min-height:70px;outline:none"></textarea>
+            </div>
 
             <div class="section">
                 <div class="section-label">Description</div>
                 <textarea id="desc-textarea" placeholder="Add a description…"></textarea>
-            </div> <!-- .section -->
+            </div>
 
             <div class="section">
                 <div class="section-label">Tags</div>
                 <div id="tags-container"></div>
                 <input id="tag-input" type="text" placeholder="Type a tag and press Enter…" />
-            </div> <!-- .section -->
+            </div>
 
             <div class="section">
-                <div class="section-label">Properties</div>
-                <div class="section">
-                    <div class="section-label">Properties <span
-                            style="font-size:10px;color:var(--muted);font-weight:400;text-transform:none">(editable —
-                            saved per building)</span></div>
-                    <div class="prop-grid">
-                        <div class="prop-item">
-                            <div class="prop-key">Levels</div><input class="prop-val" id="prop-levels"
-                                placeholder="—" />
-                        </div>
-                        <div class="prop-item">
-                            <div class="prop-key">Type</div><input class="prop-val" id="prop-type" placeholder="—" />
-                        </div>
-                        <div class="prop-item">
-                            <div class="prop-key">Roof</div><input class="prop-val" id="prop-roof" placeholder="—" />
-                        </div>
-                        <div class="prop-item">
-                            <div class="prop-key">Min Height</div><input class="prop-val" id="prop-minheight"
-                                placeholder="—" />
-                        </div>
+                <div class="section-label">
+                    Properties
+                    <span style="font-size:10px;color:var(--muted);font-weight:400;text-transform:none">
+                        (editable — saved per building)
+                    </span>
+                </div>
+                <div class="prop-grid">
+                    <div class="prop-item">
+                        <div class="prop-key">Levels</div>
+                        <input class="prop-val" id="prop-levels" placeholder="—" />
+                    </div>
+                    <div class="prop-item">
+                        <div class="prop-key">Type</div>
+                        <input class="prop-val" id="prop-type" placeholder="—" />
+                    </div>
+                    <div class="prop-item">
+                        <div class="prop-key">Roof</div>
+                        <input class="prop-val" id="prop-roof" placeholder="—" />
+                    </div>
+                    <div class="prop-item">
+                        <div class="prop-key">Min Height</div>
+                        <input class="prop-val" id="prop-minheight" placeholder="—" />
                     </div>
                 </div>
-            </div> <!-- .section -->
+            </div>
 
-        </div> <!-- #sidebar-body -->
+        </div>
 
         <div id="sidebar-footer">
             <button id="btn-save">Save changes</button>
-        </div> <!-- #sidebar-footer -->
+        </div>
 
-    </div> <!-- #sidebar -->
+    </div>
 
     <script src="https://unpkg.com/maplibre-gl@latest/dist/maplibre-gl.js"></script>
-    <script src="view/map.js"></script>
+    <script type="module" src="src/view/map.js"></script>
 </body>
 
 </html>

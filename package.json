@@ -1,0 +1,20 @@
+{
+  "name": "omirgazhap",
+  "version": "1.0.0",
+  "description": "rep for nis 2026 hackathon project",
+  "main": "index.js",
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "vite": "^8.0.1"
+  },
+  "dependencies": {
+    "@mapbox/mapbox-gl-draw": "^1.5.1",
+    "@supabase/supabase-js": "^2.99.2"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build"
+  }
+}
