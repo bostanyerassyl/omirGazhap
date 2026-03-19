@@ -116,6 +116,66 @@ export async function listProfiles(): Promise<AuthResult<Profile[]>> {
   }
 }
 
+export async function listProfilesByIds(
+  userIds: string[],
+): Promise<AuthResult<Record<string, Profile>>> {
+  if (userIds.length === 0) {
+    return {
+      data: {},
+      error: null,
+    }
+  }
+
+  try {
+    const uniqueIds = Array.from(new Set(userIds))
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .in('id', uniqueIds)
+      .returns<ProfileRecord[]>()
+
+    if (error) {
+      return {
+        data: null,
+        error,
+      }
+    }
+
+    return {
+      data: (data ?? []).reduce<Record<string, Profile>>((accumulator, profile) => {
+        const normalizedProfile = normalizeProfile(profile)
+        accumulator[normalizedProfile.id] = normalizedProfile
+        return accumulator
+      }, {}),
+      error: null,
+    }
+  } catch (error) {
+    return toProfileError<Record<string, Profile>>(error, 'profile.listByIds')
+  }
+}
+
+export async function countProfiles(): Promise<AuthResult<number>> {
+  try {
+    const { count, error } = await supabase
+      .from('profiles')
+      .select('id', { count: 'exact', head: true })
+
+    if (error) {
+      return {
+        data: null,
+        error,
+      }
+    }
+
+    return {
+      data: count ?? 0,
+      error: null,
+    }
+  } catch (error) {
+    return toProfileError<number>(error, 'profile.count')
+  }
+}
+
 export async function createProfile(
   userId: string,
   initialData: ProfileCreateInput,

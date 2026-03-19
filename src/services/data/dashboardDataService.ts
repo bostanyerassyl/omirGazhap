@@ -1,4 +1,16 @@
+import { assetService } from '@/services/domain/assetService'
+import { caseService } from '@/services/domain/caseService'
+import { eventService } from '@/services/domain/eventService'
+import { observationService } from '@/services/domain/observationService'
+import {
+  countProfiles,
+  getProfile,
+  listProfilesByIds,
+} from '@/services/api/profileService'
+import { logger } from '@/services/logger'
 import type { AuthResult, Role } from '@/types/auth'
+import type { AssetItem } from '@/types/asset'
+import type { CaseItem } from '@/types/case'
 import type {
   AkimatActivity,
   AkimatQuickStat,
@@ -10,13 +22,14 @@ import type {
   RoleRequest,
   UtilitiesChartTypeOption,
 } from '@/types/dashboard'
+import type { EventItem } from '@/types/event'
+import type { ObservationItem } from '@/types/observation'
 import type { Profile } from '@/types/profile'
-import { listProfiles } from '@/services/api/profileService'
-import { logger } from '@/services/logger'
 import { toError } from '@/utils/error'
 
 type DashboardDataOptions = {
   userId?: string | null
+  role?: Role | null
 }
 
 const utilitiesChartTypes: UtilitiesChartTypeOption[] = [
@@ -56,15 +69,15 @@ function createEmptyDashboardData(): DashboardData {
   }
 }
 
-function formatTimestamp(value: string | null, fallbackIndex: number) {
+function formatTimestamp(value: string | null, fallback = 'Recently updated') {
   if (!value) {
-    return `${fallbackIndex + 1} item(s) synced`
+    return fallback
   }
 
   const date = new Date(value)
 
   if (Number.isNaN(date.getTime())) {
-    return `${fallbackIndex + 1} item(s) synced`
+    return fallback
   }
 
   return date.toLocaleString('en-US', {
@@ -73,6 +86,38 @@ function formatTimestamp(value: string | null, fallbackIndex: number) {
     hour: '2-digit',
     minute: '2-digit',
   })
+}
+
+function severityToPriority(
+  severity: EventItem['severity'],
+): FeatureRequest['priority'] {
+  switch (severity) {
+    case 'critical':
+      return 'high'
+    case 'high':
+      return 'high'
+    case 'medium':
+      return 'medium'
+    default:
+      return 'low'
+  }
+}
+
+function caseStatusToAdminStatus(
+  status: CaseItem['status'],
+): FeatureRequest['status'] {
+  switch (status) {
+    case 'resolved':
+      return 'approved'
+    case 'closed':
+      return 'approved'
+    case 'rejected':
+      return 'rejected'
+    case 'in_progress':
+      return 'in-review'
+    default:
+      return 'pending'
+  }
 }
 
 function roleLabel(role: Role | null) {
@@ -92,260 +137,314 @@ function roleLabel(role: Role | null) {
   }
 }
 
-function seedFromId(id: string) {
-  return id.split('').reduce((sum, character) => sum + character.charCodeAt(0), 0)
+function actorName(
+  profilesMap: Record<string, Profile>,
+  userId: string | null,
+  fallback: string,
+) {
+  if (!userId) {
+    return fallback
+  }
+
+  return profilesMap[userId]?.fullName || profilesMap[userId]?.email || fallback
 }
 
-function buildDashboardEvents(profiles: Profile[]): DashboardEvent[] {
-  return profiles.slice(0, 6).map((profile, index) => ({
-    id: `event-${profile.id}`,
-    title: `${roleLabel(profile.role)} onboarding session`,
-    date: formatTimestamp(profile.createdAt ?? profile.updatedAt, index).split(',')[0],
-    time: formatTimestamp(profile.createdAt ?? profile.updatedAt, index).split(',')[1]?.trim() ?? '09:00 AM',
-    location: profile.address || 'Alatau Smart City Hub',
-  }))
+function actorEmail(
+  profilesMap: Record<string, Profile>,
+  userId: string | null,
+) {
+  if (!userId) {
+    return 'unknown@system.local'
+  }
+
+  return profilesMap[userId]?.email || 'unknown@system.local'
 }
 
-function buildConstructionObjects(profiles: Profile[]): ConstructionObject[] {
-  const developerProfiles = profiles.filter((profile) => profile.role === 'developer')
+function actorRole(
+  profilesMap: Record<string, Profile>,
+  userId: string | null,
+) {
+  if (!userId) {
+    return 'resident' as const
+  }
 
-  return developerProfiles.map((profile) => {
-    const seed = seedFromId(profile.id)
+  return profilesMap[userId]?.role ?? 'resident'
+}
+
+function buildDashboardEvents(events: EventItem[]): DashboardEvent[] {
+  return events.slice(0, 6).map((event) => {
+    const timestamp = event.startsAt ?? event.createdAt
+    const formattedTimestamp = formatTimestamp(timestamp, 'TBD')
+    const [date, time = 'TBD'] = formattedTimestamp.split(',')
+
+    return {
+      id: event.id,
+      title: event.title,
+      date,
+      time: time.trim(),
+      location: event.locationName ?? 'Alatau Smart City',
+    }
+  })
+}
+
+function buildConstructionObjects(assets: AssetItem[]): ConstructionObject[] {
+  return assets.slice(0, 12).map((asset, index) => {
     const statusCycle: ConstructionObject['status'][] = [
       'planning',
       'in-progress',
       'completed',
       'delayed',
     ]
-    const status = statusCycle[seed % statusCycle.length]
-    const progressByStatus: Record<ConstructionObject['status'], number> = {
-      planning: 15,
-      'in-progress': 55,
-      completed: 100,
-      delayed: 35,
-    }
-    const deadline = new Date()
-    deadline.setDate(deadline.getDate() + 30 + (seed % 180))
+    const derivedStatus = statusCycle[index % statusCycle.length]
+    const createdAt = asset.createdAt ? new Date(asset.createdAt) : new Date()
+    const deadline = new Date(createdAt)
+    deadline.setDate(deadline.getDate() + 90)
 
     return {
-      id: `construction-${profile.id}`,
-      name:
-        profile.companyName ||
-        `${profile.fullName || profile.email.split('@')[0]} Smart Quarter`,
-      address: profile.address || 'Alatau District, development zone',
-      status,
+      id: asset.id,
+      name: `${asset.type.charAt(0).toUpperCase()}${asset.type.slice(1)} Asset`,
+      address: asset.locationName ?? 'Unassigned location',
+      status: asset.status === 'active' ? derivedStatus : 'delayed',
       deadline: deadline.toISOString().slice(0, 10),
-      progress: progressByStatus[status],
+      progress: asset.status === 'active' ? 55 : 25,
       coordinates: {
-        lat: 43.15 + ((seed % 90) - 45) / 1000,
-        lng: 76.89 + ((seed % 70) - 35) / 1000,
+        lat: asset.latitude ?? 43.238949,
+        lng: asset.longitude ?? 76.889709,
       },
     }
   })
 }
 
-function buildQuickStats(profiles: Profile[]): AkimatQuickStat[] {
-  const totalProfiles = profiles.length
-  const developers = profiles.filter((profile) => profile.role === 'developer').length
-  const utilities = profiles.filter((profile) => profile.role === 'utilities').length
-  const industrialists = profiles.filter(
-    (profile) => profile.role === 'industrialist',
-  ).length
-
+function buildQuickStats(
+  assets: AssetItem[],
+  cases: CaseItem[],
+  events: EventItem[],
+  observations: ObservationItem[],
+): AkimatQuickStat[] {
   return [
     {
-      label: 'Registered Profiles',
-      value: `${totalProfiles}`,
+      label: 'Tracked Assets',
+      value: `${assets.length}`,
       icon: 'building',
       color: 'text-accent',
     },
     {
-      label: 'Developers',
-      value: `${developers}`,
+      label: 'Open Cases',
+      value: `${cases.filter((item) => item.status === 'open').length}`,
       icon: 'alert',
       color: 'text-amber-400',
     },
     {
-      label: 'Utilities Teams',
-      value: `${utilities}`,
+      label: 'Active Events',
+      value: `${events.length}`,
       icon: 'camera',
       color: 'text-green-400',
     },
     {
-      label: 'Industrialists',
-      value: `${industrialists}`,
+      label: 'Observations',
+      value: `${observations.length}`,
       icon: 'chart',
       color: 'text-blue-400',
     },
   ]
 }
 
-function buildRecentActivity(profiles: Profile[]): AkimatActivity[] {
-  return profiles.slice(0, 6).map((profile, index) => ({
-    type: profile.role === 'utilities' ? 'stats' : 'request',
-    text: `${roleLabel(profile.role)} profile updated: ${profile.fullName || profile.email || profile.id}`,
-    time: formatTimestamp(profile.updatedAt ?? profile.createdAt, index),
-    icon:
-      profile.role === 'akimat'
-        ? 'building'
-        : profile.role === 'utilities'
-          ? 'chart'
-          : profile.role === 'industrialist'
-            ? 'camera'
-            : 'alert',
-    color:
-      profile.role === 'developer'
-        ? 'text-accent'
-        : profile.role === 'utilities'
-          ? 'text-cyan-400'
-          : profile.role === 'industrialist'
-            ? 'text-amber-400'
-            : profile.role === 'akimat'
-              ? 'text-blue-400'
-              : 'text-muted-foreground',
+function buildRecentActivity(
+  events: EventItem[],
+  cases: CaseItem[],
+): AkimatActivity[] {
+  const eventActivity = events.slice(0, 3).map<AkimatActivity>((event) => ({
+    type: 'facility',
+    text: `${event.title} at ${event.locationName ?? 'Alatau Smart City'}`,
+    time: formatTimestamp(event.createdAt),
+    icon: event.eventType === 'utility' ? 'chart' : 'camera',
+    color: event.eventType === 'utility' ? 'text-cyan-400' : 'text-accent',
   }))
+
+  const caseActivity = cases.slice(0, 3).map<AkimatActivity>((item) => ({
+    type: 'request',
+    text: `Case ${item.id.slice(0, 8)} is ${item.status.replace('_', ' ')}`,
+    time: formatTimestamp(item.updatedAt || item.createdAt),
+    icon: 'alert',
+    color: item.status === 'resolved' ? 'text-green-400' : 'text-amber-400',
+  }))
+
+  return [...eventActivity, ...caseActivity].slice(0, 6)
 }
 
-function buildFeatureRequests(profiles: Profile[]): FeatureRequest[] {
-  const requestTypes: FeatureRequest['type'][] = ['feature', 'bug', 'improvement']
-  const priorities: FeatureRequest['priority'][] = ['low', 'medium', 'high']
-  const statuses: FeatureRequest['status'][] = [
-    'pending',
-    'in-review',
-    'approved',
-    'rejected',
-  ]
-
-  return profiles.slice(0, 12).map((profile) => {
-    const seed = seedFromId(profile.id)
-    const type = requestTypes[seed % requestTypes.length]
+function buildFeatureRequests(
+  cases: CaseItem[],
+  events: EventItem[],
+  profilesMap: Record<string, Profile>,
+): FeatureRequest[] {
+  return cases.slice(0, 12).map((item) => {
+    const relatedEvent = events.find((event) => event.id === item.eventId)
 
     return {
-      id: `feature-${profile.id}`,
-      type,
-      title: `${roleLabel(profile.role)} ${type} submission`,
+      id: item.id,
+      type:
+        relatedEvent?.eventType === 'bug'
+          ? 'bug'
+          : relatedEvent?.eventType === 'improvement'
+            ? 'improvement'
+            : 'feature',
+      title: relatedEvent?.title || `Case ${item.id.slice(0, 8)}`,
       description:
-        profile.bio ||
-        `${profile.fullName || profile.email} requested an update through the profile system.`,
-      submittedBy: profile.fullName || profile.email,
-      role: profile.role ?? 'resident',
-      email: profile.email,
-      date: formatTimestamp(profile.updatedAt ?? profile.createdAt, 0),
-      status: statuses[seed % statuses.length],
-      priority: priorities[seed % priorities.length],
+        relatedEvent?.description ||
+        `Case assigned to ${item.assignedRole ?? 'unassigned'} role.`,
+      submittedBy: actorName(profilesMap, item.createdBy, 'System User'),
+      role: actorRole(profilesMap, item.createdBy),
+      email: actorEmail(profilesMap, item.createdBy),
+      date: formatTimestamp(item.createdAt),
+      status: caseStatusToAdminStatus(item.status),
+      priority:
+        relatedEvent?.severity
+          ? severityToPriority(relatedEvent.severity)
+          : item.priority === 'urgent' || item.priority === 'high'
+            ? 'high'
+            : item.priority === 'medium'
+              ? 'medium'
+              : 'low',
     }
   })
 }
 
-function buildLocationRequests(profiles: Profile[]): LocationRequest[] {
-  const locationTypes: LocationRequest['type'][] = ['place', 'ramp', 'event', 'hazard']
-  const statuses: LocationRequest['status'][] = [
-    'pending',
-    'in-review',
-    'approved',
-    'rejected',
-  ]
-
-  return profiles
-    .filter((profile) => profile.address)
-    .slice(0, 12)
-    .map((profile) => {
-      const seed = seedFromId(profile.id)
-
-      return {
-        id: `location-${profile.id}`,
-        type: locationTypes[seed % locationTypes.length],
-        name: `${profile.fullName || roleLabel(profile.role)} location update`,
-        address: profile.address || 'Alatau Smart City',
-        submittedBy: profile.fullName || profile.email,
-        role: profile.role ?? 'resident',
-        date: formatTimestamp(profile.updatedAt ?? profile.createdAt, 0),
-        coordinates: {
-          lat: 43.15 + ((seed % 90) - 45) / 1000,
-          lng: 76.89 + ((seed % 70) - 35) / 1000,
-        },
-        photos: (seed % 3) + 1,
-        status: statuses[(seed + 1) % statuses.length],
-      }
-    })
+function buildLocationRequests(
+  observations: ObservationItem[],
+  profilesMap: Record<string, Profile>,
+): LocationRequest[] {
+  return observations.slice(0, 12).map((item, index) => ({
+    id: item.id,
+    type: (['place', 'ramp', 'event', 'hazard'] as const)[index % 4],
+    name: `Observation ${item.id.slice(0, 8)}`,
+    address: item.locationName ?? 'Unknown location',
+    submittedBy: actorName(profilesMap, item.createdBy, 'System User'),
+    role: actorRole(profilesMap, item.createdBy),
+    date: formatTimestamp(item.timestamp),
+    coordinates: {
+      lat: 43.238949 + index / 1000,
+      lng: 76.889709 + index / 1000,
+    },
+    photos: 0,
+    status: 'pending',
+  }))
 }
 
-function buildRoleRequests(profiles: Profile[]): RoleRequest[] {
-  return profiles
-    .filter((profile) => profile.role && profile.role !== 'user')
-    .slice(0, 10)
-    .map((profile, index) => ({
-      id: profile.id,
-      username: profile.email.split('@')[0] || profile.id.slice(0, 8),
-      fullName: profile.fullName || profile.email || profile.id,
-      email: profile.email,
-      requestedRole: profile.role ?? 'resident',
-      currentRole: 'resident',
-      company: profile.companyName || 'Profile verified in Supabase',
-      documents: profile.licenseNumber ? ['License Number'] : ['Profile record'],
-      date: formatTimestamp(profile.updatedAt ?? profile.createdAt, index),
-      status: 'approved',
-    }))
+function buildRoleRequests(): RoleRequest[] {
+  return []
 }
 
-function buildDashboardData(
-  profiles: Profile[],
-  currentProfile: Profile | null,
-): DashboardData {
-  const data = createEmptyDashboardData()
+async function loadActorProfiles(
+  userIds: Array<string | null>,
+): Promise<AuthResult<Record<string, Profile>>> {
+  const filteredIds = userIds.filter((userId): userId is string => Boolean(userId))
+  return listProfilesByIds(filteredIds)
+}
 
-  data.dashboard.events = buildDashboardEvents(profiles)
-  data.developer.objects = buildConstructionObjects(profiles)
-  data.akimat.quickStats = buildQuickStats(profiles)
-  data.akimat.recentActivity = buildRecentActivity(profiles)
-  data.admin.totalUsers = profiles.length
-  data.admin.featureRequests = buildFeatureRequests(profiles)
-  data.admin.locationRequests = buildLocationRequests(profiles)
-  data.admin.roleRequests = buildRoleRequests(profiles)
-  data.industrialist.companyInfo = {
-    name:
-      currentProfile?.companyName ||
-      currentProfile?.fullName ||
-      'Industrial Account',
-    avatar: currentProfile?.avatarUrl ?? '',
-    notifications: data.admin.featureRequests.filter(
-      (request) => request.status === 'pending',
-    ).length,
+async function buildDashboardData(
+  userId: string | null,
+  role: Role | null,
+): Promise<AuthResult<DashboardData>> {
+  const emptyData = createEmptyDashboardData()
+
+  const [eventsResult, casesResult, assetsResult, observationsResult, totalUsersResult] =
+    await Promise.all([
+      eventService.list(role, userId),
+      caseService.list(role, userId),
+      assetService.list(role, userId),
+      observationService.list(role, userId),
+      countProfiles(),
+    ])
+
+  const firstError =
+    eventsResult.error ||
+    casesResult.error ||
+    assetsResult.error ||
+    observationsResult.error ||
+    totalUsersResult.error
+
+  if (firstError) {
+    return {
+      data: emptyData,
+      error: firstError,
+    }
   }
 
-  return data
+  const events = eventsResult.data ?? []
+  const cases = casesResult.data ?? []
+  const assets = assetsResult.data ?? []
+  const observations = observationsResult.data ?? []
+  const totalUsers = totalUsersResult.data ?? 0
+  const actorProfilesResult = await loadActorProfiles([
+    ...cases.map((item) => item.createdBy),
+    ...observations.map((item) => item.createdBy),
+  ])
+
+  if (actorProfilesResult.error) {
+    return {
+      data: emptyData,
+      error: actorProfilesResult.error,
+    }
+  }
+
+  const profilesMap = actorProfilesResult.data ?? {}
+  const currentProfileResult = userId ? await getProfile(userId) : { data: null, error: null }
+
+  if (currentProfileResult.error) {
+    return {
+      data: emptyData,
+      error: currentProfileResult.error,
+    }
+  }
+
+  return {
+    data: {
+      dashboard: {
+        events: buildDashboardEvents(events),
+      },
+      developer: {
+        objects: buildConstructionObjects(assets),
+      },
+      akimat: {
+        quickStats: buildQuickStats(assets, cases, events, observations),
+        recentActivity: buildRecentActivity(events, cases),
+      },
+      industrialist: {
+        companyInfo: {
+          name:
+            currentProfileResult.data?.companyName ||
+            currentProfileResult.data?.fullName ||
+            'Industrial Account',
+          avatar: currentProfileResult.data?.avatarUrl ?? '',
+          notifications: cases.filter((item) => item.status === 'open').length,
+        },
+      },
+      utilities: {
+        chartTypes: utilitiesChartTypes,
+      },
+      admin: {
+        totalUsers,
+        featureRequests: buildFeatureRequests(cases, events, profilesMap),
+        locationRequests: buildLocationRequests(observations, profilesMap),
+        roleRequests: buildRoleRequests(),
+      },
+    },
+    error: null,
+  }
 }
 
 export async function getDashboardData({
   userId,
+  role,
 }: DashboardDataOptions = {}): Promise<AuthResult<DashboardData>> {
-  const emptyData = createEmptyDashboardData()
-
   try {
-    const profilesResult = await listProfiles()
-
-    if (profilesResult.error) {
-      return {
-        data: emptyData,
-        error: profilesResult.error,
-      }
-    }
-
-    const profiles = profilesResult.data ?? []
-    const currentProfile = userId
-      ? profiles.find((profile) => profile.id === userId) ?? null
-      : null
-
-    return {
-      data: buildDashboardData(profiles, currentProfile),
-      error: null,
-    }
+    return await buildDashboardData(userId ?? null, role ?? null)
   } catch (error) {
     const normalizedError = toError(error)
     logger.error(normalizedError, 'dashboard-data.load')
 
     return {
-      data: emptyData,
+      data: createEmptyDashboardData(),
       error: normalizedError,
     }
   }

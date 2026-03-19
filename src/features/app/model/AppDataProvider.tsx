@@ -33,7 +33,7 @@ type AppDataContextValue = {
 const AppDataContext = createContext<AppDataContextValue | null>(null)
 
 export function AppDataProvider({ children }: PropsWithChildren) {
-  const { user } = useAuth()
+  const { user, role } = useAuth()
   const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -42,6 +42,7 @@ export function AppDataProvider({ children }: PropsWithChildren) {
     setLoading(true)
     const result = await getDashboardData({
       userId: user?.id ?? null,
+      role,
     })
 
     if (result.error) {
@@ -53,7 +54,7 @@ export function AppDataProvider({ children }: PropsWithChildren) {
 
     setData(result.data)
     setLoading(false)
-  }, [user?.id])
+  }, [role, user?.id])
 
   useEffect(() => {
     void loadData()
