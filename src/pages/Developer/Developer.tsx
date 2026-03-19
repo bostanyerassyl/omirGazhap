@@ -174,7 +174,7 @@ export default function DeveloperDashboard() {
 
       {/* Top Bar */}
       <div className="absolute top-0 left-0 right-0 z-20 p-4">
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-3 rounded-2xl border border-slate-400/20 bg-slate-950/62 p-3 text-slate-100 shadow-xl shadow-black/30 backdrop-blur-md">
           {error ? (
             <StatusMessage tone="error" className="flex items-center justify-between gap-3">
               <span>{error}</span>
@@ -197,7 +197,7 @@ export default function DeveloperDashboard() {
 
             {/* Center - Logo */}
             <div className="absolute left-1/2 -translate-x-1/2 hidden md:flex items-center gap-2">
-              <div className="h-8 w-8 rounded-lg bg-accent/20 flex items-center justify-center">
+              <div className="h-8 w-8 rounded-lg bg-accent/25 flex items-center justify-center border border-accent/30">
                 <svg viewBox="0 0 24 24" className="h-5 w-5 text-accent" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M12 2L2 7l10 5 10-5-10-5z" />
                   <path d="M2 17l10 5 10-5" />
@@ -205,8 +205,8 @@ export default function DeveloperDashboard() {
                 </svg>
               </div>
               <div>
-                <span className="text-lg font-semibold text-foreground tracking-tight">Alatau</span>
-                <span className="text-xs text-muted-foreground ml-1">Developer Portal</span>
+                <span className="text-lg font-semibold text-slate-50 tracking-tight drop-shadow">Alatau</span>
+                <span className="text-xs text-slate-300 ml-1">Developer Portal</span>
               </div>
             </div>
 
@@ -346,7 +346,7 @@ export default function DeveloperDashboard() {
 
       {/* Bottom instruction */}
       <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10">
-        <div className="bg-card/90 backdrop-blur-sm border border-border rounded-full px-4 py-2 text-sm text-muted-foreground">
+        <div className="rounded-full border border-slate-400/20 bg-slate-950/75 px-4 py-2 text-sm text-slate-200 shadow-lg shadow-black/25 backdrop-blur-sm">
           Use map tools for context and open Objects to edit project details
         </div>
       </div>
