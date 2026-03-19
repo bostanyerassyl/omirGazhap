@@ -6,20 +6,21 @@ import { useAuth } from "@/features/auth/model/AuthProvider"
 
 interface InteractiveMapViewProps {
   toolbarTop?: number
+  showDrawToolbar?: boolean
 }
 
-export function InteractiveMapView({ toolbarTop = 84 }: InteractiveMapViewProps) {
+export function InteractiveMapView({ toolbarTop = 84, showDrawToolbar }: InteractiveMapViewProps) {
   const { role } = useAuth()
   const resolvedRole = role ?? ""
-  const canEditMap = new Set([
+  const roleCanEdit = new Set([
     "admin",
     "akimat",
     "government_official",
     "government-official",
-    "developer",
     "utilities",
     "industrialist",
   ]).has(resolvedRole)
+  const canEditMap = showDrawToolbar ?? roleCanEdit
 
   useEffect(() => {
     let teardown: null | (() => void) = null

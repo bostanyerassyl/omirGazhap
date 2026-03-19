@@ -289,6 +289,26 @@ body.sidebar-open #sidebar {
   line-height: 1;
 }
 
+.developer-object-marker {
+  width: 20px;
+  height: 20px;
+  border: 2px solid #f59e0b;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.9);
+  cursor: pointer;
+}
+
+.developer-object-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: #ffffff;
+}
+
 #observations-section {
   margin-top: 10px;
   padding: 8px;

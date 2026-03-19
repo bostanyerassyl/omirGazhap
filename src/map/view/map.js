@@ -4,7 +4,7 @@ import { openFeatureSidebar, setupDraw } from './features.js';
 import { addFriend, loadFriends, setFriendsVisibility, teardownFriends } from './friends.js';
 import { addPoi, loadPoi, setPoiVisibility, teardownPoi } from './poi.js';
 import { closeSidebar } from './sidebar.js';
-import { registerMapActionHandlers } from '../../features/map/model/map-actions';
+import { emitDeveloperObjectMapClick, registerMapActionHandlers } from '../../features/map/model/map-actions';
 import { teardownTrafficLights } from './traffic-lights.js';
 
 function featureKey(feature) {
@@ -49,6 +49,54 @@ export async function initializeMapView() {
   let navEndMarker = null;
   let unregisterActions = null;
   let pendingPointPick = null;
+  const developerMarkers = new Map();
+
+  const statusColor = (status) => {
+    if (status === 'completed') return '#10b981';
+    if (status === 'delayed') return '#ef4444';
+    if (status === 'planning') return '#3b82f6';
+    return '#f59e0b';
+  };
+
+  const clearDeveloperMarkers = () => {
+    for (const marker of developerMarkers.values()) marker.remove();
+    developerMarkers.clear();
+  };
+
+  const setDeveloperObjects = (items = []) => {
+    const nextIds = new Set(items.map((item) => item.id));
+    for (const [id, marker] of developerMarkers.entries()) {
+      if (nextIds.has(id)) continue;
+      marker.remove();
+      developerMarkers.delete(id);
+    }
+
+    for (const item of items) {
+      if (!Number.isFinite(item.latitude) || !Number.isFinite(item.longitude)) continue;
+      const existing = developerMarkers.get(item.id);
+      if (existing) {
+        existing.setLngLat([item.longitude, item.latitude]);
+        const el = existing.getElement();
+        el.style.borderColor = statusColor(item.status);
+        el.title = `${item.name} (${item.status})`;
+        continue;
+      }
+      const el = document.createElement('button');
+      el.type = 'button';
+      el.className = 'developer-object-marker';
+      el.style.borderColor = statusColor(item.status);
+      el.title = `${item.name} (${item.status})`;
+      el.innerHTML = '<span class="developer-object-dot"></span>';
+      el.addEventListener('click', (event) => {
+        event.stopPropagation();
+        emitDeveloperObjectMapClick(item.id);
+      });
+      const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
+        .setLngLat([item.longitude, item.latitude])
+        .addTo(map);
+      developerMarkers.set(item.id, marker);
+    }
+  };
 
   const clearRoute = () => {
     if (map.getLayer('nav-route-line')) map.removeLayer('nav-route-line');
@@ -165,6 +213,17 @@ export async function initializeMapView() {
     setFilters: ({ ramps, scooters, friends, events, buses }) => {
       setFriendsVisibility(friends);
       setPoiVisibility({ ramps, scooters, events, buses });
+    },
+    setDeveloperObjects: (items) => {
+      setDeveloperObjects(items ?? []);
+    },
+    focusDeveloperObject: (item) => {
+      if (!item || !Number.isFinite(item.latitude) || !Number.isFinite(item.longitude)) return;
+      map.flyTo({
+        center: [item.longitude, item.latitude],
+        zoom: Math.max(15, map.getZoom()),
+        duration: 600,
+      });
     },
     pickPoint: async () => {
       if (pendingPointPick) {
@@ -300,6 +359,7 @@ export async function initializeMapView() {
 
   return () => {
     clearRoute();
+    clearDeveloperMarkers();
     teardownFriends();
     teardownPoi();
     teardownTrafficLights();

@@ -12,6 +12,7 @@ import { adminService } from '@/services/domain/adminService'
 import { assetService } from '@/services/domain/assetService'
 import { caseService } from '@/services/domain/caseService'
 import { eventService } from '@/services/domain/eventService'
+import { locationService } from '@/services/domain/locationService'
 import { observationService } from '@/services/domain/observationService'
 import { getDashboardData } from '@/services/data/dashboardDataService'
 import { logger } from '@/services/logger'
@@ -236,8 +237,34 @@ export function AppDataProvider({ children }: PropsWithChildren) {
           }
         }
 
+        let locationId = object.locationId
+        if (
+          !locationId &&
+          Number.isFinite(object.coordinates?.lat) &&
+          Number.isFinite(object.coordinates?.lng)
+        ) {
+          const locationResult = await locationService.create({
+            name:
+              object.address ||
+              object.name ||
+              `Construction site ${new Date().toLocaleDateString()}`,
+            zone: 'Growing',
+            lat: object.coordinates.lat,
+            lon: object.coordinates.lng,
+          })
+
+          if (locationResult.error || !locationResult.data) {
+            return {
+              data: null,
+              error: locationResult.error ?? new Error('Unable to create project location'),
+            }
+          }
+
+          locationId = locationResult.data.id
+        }
+
         const result = await assetService.create({
-          locationId: object.locationId,
+          locationId,
           createdBy: user.id,
           ownerProfileId: user.id,
           ownerRole: 'developer',
