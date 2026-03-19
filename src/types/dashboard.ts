@@ -1,3 +1,5 @@
+import type { Role } from './auth'
+
 export type ConstructionStatus =
   | 'planning'
   | 'in-progress'
@@ -49,7 +51,7 @@ export type FeatureRequest = {
   title: string
   description: string
   submittedBy: string
-  role: string
+  role: Role | 'resident'
   email: string
   date: string
   status: AdminRequestStatus
@@ -62,7 +64,7 @@ export type LocationRequest = {
   name: string
   address: string
   submittedBy: string
-  role: string
+  role: Role | 'resident'
   date: string
   coordinates: { lat: number; lng: number }
   photos: number
@@ -74,8 +76,8 @@ export type RoleRequest = {
   username: string
   fullName: string
   email: string
-  requestedRole: string
-  currentRole: string
+  requestedRole: Role | 'resident'
+  currentRole: Role | 'resident'
   company: string
   documents: string[]
   date: string

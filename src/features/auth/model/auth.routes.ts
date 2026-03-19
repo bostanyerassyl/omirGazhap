@@ -4,6 +4,7 @@ export const roleHomeRoutes: Record<Role, string> = {
   user: '/dashboard',
   developer: '/developer',
   industrialist: '/industrialist',
+  utilities: '/utilities',
   akimat: '/akimat',
   admin: '/admin',
 }

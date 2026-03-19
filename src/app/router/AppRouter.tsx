@@ -50,7 +50,14 @@ function AppRouter() {
             </ProtectedRoute>
           }
         />
-        <Route path="/utilities" element={<UtilitiesPage />} />
+        <Route
+          path="/utilities"
+          element={
+            <ProtectedRoute allowedRoles={['utilities']}>
+              <UtilitiesPage />
+            </ProtectedRoute>
+          }
+        />
         <Route
           path="/admin"
           element={

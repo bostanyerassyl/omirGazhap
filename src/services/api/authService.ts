@@ -16,7 +16,7 @@ export type SignUpPayload = {
   email: string
   password: string
   fullName: string
-  role: Extract<Role, 'user' | 'developer' | 'industrialist'>
+  role: Extract<Role, 'user' | 'developer' | 'industrialist' | 'utilities'>
 }
 
 export type SignInPayload = {
@@ -116,6 +116,7 @@ function resolveRole(user: User | null, fallbackRole?: Role | null): Role | null
     metadataRole === 'user' ||
     metadataRole === 'developer' ||
     metadataRole === 'industrialist' ||
+    metadataRole === 'utilities' ||
     metadataRole === 'akimat' ||
     metadataRole === 'admin'
   ) {

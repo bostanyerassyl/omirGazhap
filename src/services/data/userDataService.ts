@@ -24,6 +24,11 @@ const defaultProfiles: Record<Role, Omit<UserProfileData, 'email'>> = {
     label: 'Industrial Enterprise',
     initials: 'AS',
   },
+  utilities: {
+    name: 'Alatau Utilities',
+    label: 'ЖКХ',
+    initials: 'JK',
+  },
   akimat: {
     name: 'Akimat Administrator',
     label: 'City Administration',

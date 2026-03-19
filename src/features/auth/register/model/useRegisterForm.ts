@@ -4,7 +4,7 @@ import { useAuth } from '@/features/auth/model/AuthProvider'
 import { getDefaultRouteForRole } from '@/features/auth/model/auth.routes'
 import { registerSchema } from '@/features/auth/model/auth.schema'
 
-export type RegisterRole = 'user' | 'developer' | 'industrialist'
+export type RegisterRole = 'user' | 'developer' | 'industrialist' | 'utilities'
 
 export type RegisterFormData = {
   fullName: string
