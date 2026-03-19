@@ -17,7 +17,7 @@ const DRAW_STYLES = [
     type: 'fill',
     filter: ['all', ['==', '$type', 'Polygon'], ['!=', 'mode', 'static']],
     paint: {
-      'fill-color': ['coalesce', ['get', 'color'], DEFAULT_FEATURE_COLOR],
+      'fill-color': ['coalesce', ['get', 'user_color'], ['get', 'color'], DEFAULT_FEATURE_COLOR],
       'fill-opacity': 0.25,
     },
   },
@@ -26,7 +26,7 @@ const DRAW_STYLES = [
     type: 'line',
     filter: ['all', ['==', '$type', 'Polygon'], ['!=', 'mode', 'static']],
     paint: {
-      'line-color': ['coalesce', ['get', 'color'], DEFAULT_FEATURE_COLOR],
+      'line-color': ['coalesce', ['get', 'user_color'], ['get', 'color'], DEFAULT_FEATURE_COLOR],
       'line-width': 2,
     },
   },
@@ -35,7 +35,7 @@ const DRAW_STYLES = [
     type: 'line',
     filter: ['all', ['==', '$type', 'LineString'], ['!=', 'mode', 'static']],
     paint: {
-      'line-color': ['coalesce', ['get', 'color'], DEFAULT_FEATURE_COLOR],
+      'line-color': ['coalesce', ['get', 'user_color'], ['get', 'color'], DEFAULT_FEATURE_COLOR],
       'line-width': 3,
     },
   },
@@ -45,7 +45,7 @@ const DRAW_STYLES = [
     filter: ['all', ['==', '$type', 'Point'], ['!=', 'meta', 'midpoint'], ['!=', 'mode', 'static']],
     paint: {
       'circle-radius': 6,
-      'circle-color': ['coalesce', ['get', 'color'], DEFAULT_FEATURE_COLOR],
+      'circle-color': ['coalesce', ['get', 'user_color'], ['get', 'color'], DEFAULT_FEATURE_COLOR],
       'circle-stroke-color': '#ffffff',
       'circle-stroke-width': 1.5,
     },
@@ -118,6 +118,32 @@ function resolveFeatureDbId(feature) {
   return null;
 }
 
+async function ensurePointAssetId(feature, dbId = null) {
+  if (feature?.geometry?.type !== 'Point') return feature?.properties?.asset_id ?? null;
+  const coordKey = getCoordKey(feature.geometry);
+  if (!coordKey) return feature?.properties?.asset_id ?? null;
+
+  const current = feature?.properties?.asset_id;
+  if (current && isUuid(current)) return current;
+
+  let query = supabase
+    .from('Map Features')
+    .select('id, asset_id')
+    .eq('coord_key', coordKey)
+    .not('asset_id', 'is', null)
+    .limit(1);
+
+  if (dbId) query = query.neq('id', dbId);
+  const { data, error } = await query.maybeSingle();
+  if (error) {
+    console.error('ensurePointAssetId lookup error:', error.message);
+  }
+
+  const nextAssetId = data?.asset_id || crypto.randomUUID();
+  feature.properties = { ...(feature.properties ?? {}), asset_id: nextAssetId };
+  return nextAssetId;
+}
+
 function getCurrentRole() {
   const fromDataset = document.getElementById('map')?.dataset?.role;
   if (fromDataset) return ROLE_ALIASES[fromDataset] ?? fromDataset;
@@ -179,6 +205,7 @@ export async function saveFeature(feature) {
   if (!id) { console.error('saveFeature: no id'); return; }
   feature.properties = { ...(feature.properties ?? {}), id };
   drawIdToDbId.set(feature.id, id);
+  await ensurePointAssetId(feature, id);
 
   const baseRow = {
     id,
@@ -289,6 +316,7 @@ export async function openFeatureSidebar(feature, draw, map) {
     feature.properties = { ...(feature.properties ?? {}), id: dbId };
   }
   drawIdToDbId.set(drawId, dbId);
+  await ensurePointAssetId(feature, dbId);
 
   setActiveFeature(feature);
   setActiveDraw(draw);
@@ -797,6 +825,7 @@ export async function setupDraw(map) {
     draw.add(saved);
     for (const feat of saved.features) {
       drawIdToDbId.set(feat.id, feat.properties?.id ?? feat.id);
+      draw.setFeatureProperty(feat.id, 'color', feat.properties?.color ?? DEFAULT_FEATURE_COLOR);
       if (feat.geometry.type === 'Point' && feat.properties.icon) {
         updateIconMarker(map, feat.id, feat.geometry.coordinates,
           feat.properties.icon, feat.properties.icon_url);
@@ -828,8 +857,14 @@ export async function setupDraw(map) {
     const feature = e.features[0];
     const dbId = crypto.randomUUID();
     feature.properties.id = dbId;
+    if (!feature.properties.color) feature.properties.color = DEFAULT_FEATURE_COLOR;
     draw.setFeatureProperty(feature.id, 'id', dbId);
+    draw.setFeatureProperty(feature.id, 'color', feature.properties.color);
     drawIdToDbId.set(feature.id, dbId);
+    await ensurePointAssetId(feature, dbId);
+    if (feature.properties.asset_id) {
+      draw.setFeatureProperty(feature.id, 'asset_id', feature.properties.asset_id);
+    }
     await saveFeature(feature);
     openFeatureSidebar(feature, draw, map);
   });
@@ -840,6 +875,11 @@ export async function setupDraw(map) {
       if (dbId && feature.properties?.id !== dbId) {
         draw.setFeatureProperty(feature.id, 'id', dbId);
       }
+      await ensurePointAssetId(feature, dbId);
+      if (feature.properties?.asset_id) {
+        draw.setFeatureProperty(feature.id, 'asset_id', feature.properties.asset_id);
+      }
+      draw.setFeatureProperty(feature.id, 'color', feature.properties?.color ?? DEFAULT_FEATURE_COLOR);
       await saveFeature(feature);
       if (feature.geometry.type === 'Point') {
         updateIconMarker(map, feature.id, feature.geometry.coordinates,
