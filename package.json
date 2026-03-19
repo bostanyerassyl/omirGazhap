@@ -1,8 +1,20 @@
 {
-  "name": "frontend",
-  "private": true,
+  "name": "package.json",
   "version": "0.0.0",
+  "private": true,
+  "description": "rep for nis 2026 hackathon project",
+  "homepage": "https://github.com/bostanyerassyl/omirGazhap#readme",
+  "bugs": {
+    "url": "https://github.com/bostanyerassyl/omirGazhap/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bostanyerassyl/omirGazhap.git"
+  },
+  "license": "ISC",
+  "author": "",
   "type": "module",
+  "main": "eslint.config.js",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
