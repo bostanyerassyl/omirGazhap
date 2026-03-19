@@ -1,39 +1,14 @@
-import { useState } from "react"
-import { 
-  AlertTriangle, 
-  Building2, 
-  Construction, 
+import { useState } from 'react'
+import {
+  AlertTriangle,
+  Building2,
+  Construction,
   MapPin,
   Wrench,
-  Flame,
-  Droplets,
-  X
-} from "lucide-react"
-import { cn } from "@/utils/cn"
-
-interface MapMarker {
-  id: string
-  type: "building" | "problem" | "construction" | "utility-issue"
-  name: string
-  address: string
-  lat: number
-  lng: number
-  status?: string
-  details?: string
-  reportedBy?: string
-  date?: string
-}
-
-const markers: MapMarker[] = [
-  { id: "1", type: "building", name: "Residential Complex Alatau", address: "Abay St, 45", lat: 35, lng: 25, status: "Active", details: "12 floors, 240 apartments" },
-  { id: "2", type: "problem", name: "Road Damage", address: "Nazarbayev Ave, 112", lat: 55, lng: 40, status: "In Progress", details: "Large pothole causing traffic issues", reportedBy: "Citizen", date: "2024-01-15" },
-  { id: "3", type: "construction", name: "Business Center", address: "Dostyk St, 78", lat: 45, lng: 65, status: "Under Construction", details: "Expected completion: Q3 2024" },
-  { id: "4", type: "utility-issue", name: "Water Leak", address: "Tole Bi St, 23", lat: 70, lng: 30, status: "Critical", details: "Major water main break", reportedBy: "Utility Service", date: "2024-01-18" },
-  { id: "5", type: "problem", name: "Street Light Outage", address: "Satpayev St, 56", lat: 25, lng: 55, status: "Pending", details: "Multiple lights not working", reportedBy: "Citizen", date: "2024-01-17" },
-  { id: "6", type: "building", name: "School #45", address: "Zhandosov St, 12", lat: 60, lng: 75, status: "Active", details: "Public school, 800 students" },
-  { id: "7", type: "construction", name: "Park Development", address: "Al-Farabi Ave, 200", lat: 40, lng: 45, status: "Planning", details: "New green zone project" },
-  { id: "8", type: "utility-issue", name: "Gas Leak Report", address: "Baitursynov St, 89", lat: 80, lng: 60, status: "Resolved", details: "Minor leak, repaired", reportedBy: "Industrialist", date: "2024-01-10" },
-]
+  X,
+} from 'lucide-react'
+import { cn } from '@/utils/cn'
+import type { AkimatMapMarker } from '@/types/dashboard'
 
 const markerIcons = {
   building: Building2,
@@ -49,8 +24,12 @@ const markerColors = {
   "utility-issue": "bg-orange-500",
 }
 
-export function AkimatMap() {
-  const [selectedMarker, setSelectedMarker] = useState<MapMarker | null>(null)
+type AkimatMapProps = {
+  markers: AkimatMapMarker[]
+}
+
+export function AkimatMap({ markers }: AkimatMapProps) {
+  const [selectedMarker, setSelectedMarker] = useState<AkimatMapMarker | null>(null)
   const [filter, setFilter] = useState<string>("all")
 
   const filteredMarkers = filter === "all" 
@@ -97,8 +76,10 @@ export function AkimatMap() {
       </div>
 
       {/* Markers */}
-      {filteredMarkers.map((marker) => {
+      {filteredMarkers.map((marker, index) => {
         const Icon = markerIcons[marker.type]
+        const left = 12 + ((index * 19) % 76)
+        const top = 18 + ((index * 13) % 64)
         return (
           <button
             key={marker.id}
@@ -107,13 +88,21 @@ export function AkimatMap() {
               markerColors[marker.type],
               selectedMarker?.id === marker.id && "ring-2 ring-white scale-125"
             )}
-            style={{ left: `${marker.lng}%`, top: `${marker.lat}%` }}
+            style={{ left: `${left}%`, top: `${top}%` }}
             onClick={() => setSelectedMarker(marker)}
           >
             <Icon className="h-4 w-4 text-white" />
           </button>
         )
       })}
+
+      {filteredMarkers.length === 0 ? (
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="rounded-lg border border-dashed border-border bg-card/90 px-4 py-3 text-sm text-muted-foreground">
+            No mapped facilities or issues yet.
+          </div>
+        </div>
+      ) : null}
 
       {/* Filter Legend */}
       <div className="absolute top-4 left-1/2 -translate-x-1/2 flex gap-2 bg-card/90 backdrop-blur-sm p-2 rounded-lg border border-border">

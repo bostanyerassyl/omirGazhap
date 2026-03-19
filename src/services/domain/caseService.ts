@@ -72,4 +72,47 @@ export const caseService = {
       }
     }
   },
+
+  async updateStatus(id: string, status: CaseStatus): Promise<AuthResult<CaseItem>> {
+    try {
+      const payload: {
+        status: CaseStatus
+        resolved_at?: string | null
+      } = {
+        status,
+      }
+
+      if (status === 'resolved' || status === 'closed') {
+        payload.resolved_at = new Date().toISOString()
+      } else if (status === 'rejected' || status === 'open' || status === 'in_progress') {
+        payload.resolved_at = null
+      }
+
+      const { data, error } = await supabase
+        .from('cases')
+        .update(payload)
+        .eq('id', id)
+        .select('*')
+        .single<CaseRecord>()
+
+      if (error) {
+        return {
+          data: null,
+          error,
+        }
+      }
+
+      return {
+        data: mapCase(data),
+        error: null,
+      }
+    } catch (error) {
+      const normalizedError = toError(error)
+      logger.error(normalizedError, 'case.updateStatus')
+      return {
+        data: null,
+        error: normalizedError,
+      }
+    }
+  },
 }

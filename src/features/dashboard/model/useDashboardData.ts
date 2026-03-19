@@ -12,6 +12,7 @@ export function useDashboardData<K extends keyof DashboardData>(section: K) {
       error: context.error,
       reloadData: context.reloadData,
       updateDeveloperObject: context.updateDeveloperObject,
+      updateAkimatRequestStatus: context.updateAkimatRequestStatus,
       reviewAdminItem: context.reviewAdminItem,
     }),
     [context, section],

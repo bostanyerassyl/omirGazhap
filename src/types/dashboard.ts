@@ -31,6 +31,153 @@ export type AkimatQuickStat = {
   color: string
 }
 
+export type CitizenRequestType = 'complaint' | 'suggestion' | 'letter'
+
+export type CitizenRequestStatus =
+  | 'pending'
+  | 'in-progress'
+  | 'resolved'
+  | 'rejected'
+
+export type CitizenRequest = {
+  id: string
+  type: CitizenRequestType
+  subject: string
+  message: string
+  from: string
+  address: string
+  date: string
+  status: CitizenRequestStatus
+  category: string
+}
+
+export type AkimatCameraStatus = 'online' | 'offline' | 'maintenance'
+
+export type AkimatCameraFeed = {
+  id: string
+  name: string
+  location: string
+  type: 'road' | 'courtyard' | 'building' | 'street'
+  status: AkimatCameraStatus
+  thumbnail: 'road' | 'courtyard' | 'building' | 'street'
+}
+
+export type AkimatFacility = {
+  id: string
+  name: string
+  developer: string
+  developerContact: {
+    phone: string
+    email: string
+  }
+  address: string
+  type: 'residential' | 'commercial' | 'industrial' | 'public'
+  status: 'planning' | 'in-progress' | 'completed' | 'delayed'
+  progress: number
+  deadline: string
+  startDate: string
+  details: string
+  reports: number
+  lastUpdate: string
+}
+
+export type AkimatMapMarker = {
+  id: string
+  type: 'building' | 'problem' | 'construction' | 'utility-issue'
+  name: string
+  address: string
+  lat: number
+  lng: number
+  status?: string
+  details?: string
+  reportedBy?: string
+  date?: string
+}
+
+export type AkimatRequestOverview = {
+  complaints: number
+  suggestions: number
+  letters: number
+  total: number
+}
+
+export type AkimatSurveillanceSummary = {
+  online: number
+  offline: number
+  maintenance: number
+  total: number
+}
+
+export type AkimatReportsSummary = {
+  developer: number
+  utilities: number
+  industrialist: number
+  total: number
+}
+
+export type AkimatProfileSummary = {
+  name: string
+  email: string
+  avatar: string
+}
+
+export type AkimatUtilityMetricPoint = {
+  period: string
+  events: number
+  cases: number
+  observations: number
+}
+
+export type AkimatZoneMetric = {
+  zone: string
+  facilities: number
+  issues: number
+  cameras: number
+}
+
+export type AkimatIndustrialMetricPoint = {
+  period: string
+  facilities: number
+  issues: number
+  observations: number
+}
+
+export type AkimatTrafficMetricPoint = {
+  period: string
+  incidents: number
+  observations: number
+}
+
+export type AkimatStreetTraffic = {
+  name: string
+  congestion: number
+  avgSpeed: number
+  incidents: number
+}
+
+export type AkimatStatistics = {
+  utilitySummary: {
+    events: number
+    cases: number
+    observations: number
+  }
+  utilityMonthly: AkimatUtilityMetricPoint[]
+  utilityByZone: AkimatZoneMetric[]
+  industrialSummary: {
+    facilities: number
+    issues: number
+    observations: number
+  }
+  industrialMonthly: AkimatIndustrialMetricPoint[]
+  trafficSummary: {
+    incidents: number
+    observations: number
+    activeLocations: number
+  }
+  trafficMonthly: AkimatTrafficMetricPoint[]
+  trafficByStreet: AkimatStreetTraffic[]
+}
+
 export type AkimatActivity = {
   type: 'request' | 'camera' | 'facility' | 'stats'
   text: string
@@ -107,6 +254,16 @@ export type DashboardData = {
   akimat: {
     quickStats: AkimatQuickStat[]
     recentActivity: AkimatActivity[]
+    requestOverview: AkimatRequestOverview
+    surveillanceSummary: AkimatSurveillanceSummary
+    reportsSummary: AkimatReportsSummary
+    citizenRequests: CitizenRequest[]
+    cameras: AkimatCameraFeed[]
+    facilities: AkimatFacility[]
+    mapMarkers: AkimatMapMarker[]
+    statistics: AkimatStatistics
+    notifications: number
+    profile: AkimatProfileSummary
   }
   industrialist: {
     companyInfo: IndustrialistCompanyInfo

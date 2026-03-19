@@ -9,6 +9,7 @@ import {
 } from 'react'
 import { useAuth } from '@/features/auth/model/AuthProvider'
 import { adminService } from '@/services/domain/adminService'
+import { caseService } from '@/services/domain/caseService'
 import { getDashboardData } from '@/services/data/dashboardDataService'
 import { logger } from '@/services/logger'
 import type { AuthResult } from '@/types/auth'
@@ -16,6 +17,7 @@ import type {
   AdminReviewAction,
   AdminReviewTarget,
   ConstructionObject,
+  CitizenRequestStatus,
   DashboardData,
 } from '@/types/dashboard'
 
@@ -25,6 +27,10 @@ type AppDataContextValue = {
   error: string | null
   reloadData: () => Promise<void>
   updateDeveloperObject: (object: ConstructionObject) => void
+  updateAkimatRequestStatus: (
+    id: string,
+    status: CitizenRequestStatus,
+  ) => Promise<AuthResult<null>>
   reviewAdminItem: (
     target: AdminReviewTarget,
     id: string,
@@ -85,6 +91,27 @@ export function AppDataProvider({ children }: PropsWithChildren) {
             },
           }
         })
+      },
+      async updateAkimatRequestStatus(id, status) {
+        const nextStatus =
+          status === 'in-progress'
+            ? 'in_progress'
+            : status === 'resolved'
+              ? 'resolved'
+              : status === 'rejected'
+                ? 'rejected'
+                : 'open'
+
+        const result = await caseService.updateStatus(id, nextStatus)
+
+        if (!result.error) {
+          await loadData()
+        }
+
+        return {
+          data: null,
+          error: result.error,
+        }
       },
       async reviewAdminItem(target, id, action, note) {
         if (!user) {

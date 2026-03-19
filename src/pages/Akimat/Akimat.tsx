@@ -1,18 +1,17 @@
-import { useState } from "react"
-import { 
+import {
   User,
   LogOut,
   Settings,
-  Bell,
   Building2,
   AlertTriangle,
   Camera,
-  BarChart3
-} from "lucide-react"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { StatusMessage } from "@/components/ui/status-message"
+  BarChart3,
+} from 'lucide-react'
+import { useState } from 'react'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { StatusMessage } from '@/components/ui/status-message'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,19 +19,34 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { AkimatMap } from "@/components/akimat/akimat-map"
-import { RequestsPanel } from "@/components/akimat/requests-panel"
-import { CamerasPanel } from "@/components/akimat/cameras-panel"
-import { FacilitiesPanel } from "@/components/akimat/facilities-panel"
-import { StatisticsPanel } from "@/components/akimat/statistics-panel"
-import { useAuth } from "@/features/auth/model/AuthProvider"
-import { useDashboardData } from "@/features/dashboard/model/useDashboardData"
+} from '@/components/ui/dropdown-menu'
+import { AkimatMap } from '@/components/akimat/akimat-map'
+import { RequestsPanel } from '@/components/akimat/requests-panel'
+import { CamerasPanel } from '@/components/akimat/cameras-panel'
+import { FacilitiesPanel } from '@/components/akimat/facilities-panel'
+import { StatisticsPanel } from '@/components/akimat/statistics-panel'
+import { NotificationsPanel } from '@/components/akimat/notifications-panel'
+import { AkimatProfileSheet } from '@/components/akimat/akimat-profile-sheet'
+import { useAuth } from '@/features/auth/model/AuthProvider'
+import { useDashboardData } from '@/features/dashboard/model/useDashboardData'
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet'
 
 export default function AkimatDashboard() {
-  const [notifications] = useState(5)
+  const [isProfileOpen, setIsProfileOpen] = useState(false)
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const { logout } = useAuth()
-  const { data, error, reloadData } = useDashboardData("akimat")
+  const { data, error, reloadData, updateAkimatRequestStatus } = useDashboardData("akimat")
+  const notifications = data?.notifications ?? 0
+  const profile = data?.profile
+  const requestOverview = data?.requestOverview
+  const surveillanceSummary = data?.surveillanceSummary
+  const reportsSummary = data?.reportsSummary
 
   const iconMap = {
     building: Building2,
@@ -51,9 +65,14 @@ export default function AkimatDashboard() {
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="relative h-9 w-9 rounded-full">
                 <Avatar className="h-9 w-9 border-2 border-accent">
-                  <AvatarImage src="" alt="Akimat Admin" />
+                  <AvatarImage src={profile?.avatar} alt={profile?.name || 'Akimat Admin'} />
                   <AvatarFallback className="bg-accent text-accent-foreground font-medium">
-                    AK
+                    {(profile?.name || 'Akimat Administrator')
+                      .split(' ')
+                      .map((part) => part[0])
+                      .join('')
+                      .slice(0, 2)
+                      .toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
               </Button>
@@ -61,16 +80,28 @@ export default function AkimatDashboard() {
             <DropdownMenuContent className="w-56" align="start">
               <DropdownMenuLabel>
                 <div className="flex flex-col space-y-1">
-                  <p className="text-sm font-medium">Akimat Administrator</p>
-                  <p className="text-xs text-muted-foreground">admin@alatau.gov.kz</p>
+                  <p className="text-sm font-medium">{profile?.name || 'Akimat Administrator'}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {profile?.email || 'admin@alatau.gov.kz'}
+                  </p>
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem>
+              <DropdownMenuItem
+                onSelect={(event) => {
+                  event.preventDefault()
+                  setIsProfileOpen(true)
+                }}
+              >
                 <User className="mr-2 h-4 w-4" />
                 <span>Profile</span>
               </DropdownMenuItem>
-              <DropdownMenuItem>
+              <DropdownMenuItem
+                onSelect={(event) => {
+                  event.preventDefault()
+                  setIsSettingsOpen(true)
+                }}
+              >
                 <Settings className="mr-2 h-4 w-4" />
                 <span>Settings</span>
               </DropdownMenuItem>
@@ -102,21 +133,21 @@ export default function AkimatDashboard() {
 
         {/* Right side - Action Buttons */}
         <div className="flex items-center gap-2">
-          {/* Notifications */}
-          <Button variant="outline" size="icon" className="relative">
-            <Bell className="h-5 w-5" />
-            {notifications > 0 && (
-              <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-red-500 text-xs text-white flex items-center justify-center">
-                {notifications}
-              </span>
-            )}
-          </Button>
+          <NotificationsPanel
+            count={notifications}
+            requests={data?.citizenRequests ?? []}
+            cameras={data?.cameras ?? []}
+            recentActivity={data?.recentActivity ?? []}
+          />
 
           {/* Main Action Buttons */}
-          <RequestsPanel />
-          <CamerasPanel />
-          <FacilitiesPanel />
-          <StatisticsPanel />
+          <RequestsPanel
+            requests={data?.citizenRequests ?? []}
+            onUpdateStatus={async (id, status) => updateAkimatRequestStatus(id, status)}
+          />
+          <CamerasPanel cameras={data?.cameras ?? []} />
+          <FacilitiesPanel facilities={data?.facilities ?? []} />
+          <StatisticsPanel statistics={data?.statistics} />
         </div>
       </header>
 
@@ -173,7 +204,7 @@ export default function AkimatDashboard() {
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0 h-[350px]">
-              <AkimatMap />
+              <AkimatMap markers={data?.mapMarkers ?? []} />
             </CardContent>
           </Card>
 
@@ -210,22 +241,31 @@ export default function AkimatDashboard() {
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm">Complaints</span>
-                  <span className="text-sm font-medium text-red-400">28</span>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm">Complaints</span>
+                  <span className="text-sm font-medium text-red-400">{requestOverview?.complaints ?? 0}</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sm">Suggestions</span>
-                  <span className="text-sm font-medium text-blue-400">12</span>
+                  <span className="text-sm font-medium text-blue-400">{requestOverview?.suggestions ?? 0}</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sm">Letters</span>
-                  <span className="text-sm font-medium text-green-400">5</span>
+                  <span className="text-sm font-medium text-green-400">{requestOverview?.letters ?? 0}</span>
                 </div>
                 <div className="h-2 bg-secondary rounded-full mt-3 overflow-hidden flex">
-                  <div className="bg-red-400 h-full" style={{ width: "62%" }} />
-                  <div className="bg-blue-400 h-full" style={{ width: "27%" }} />
-                  <div className="bg-green-400 h-full" style={{ width: "11%" }} />
+                  <div
+                    className="bg-red-400 h-full"
+                    style={{ width: `${requestOverview?.total ? (requestOverview.complaints / requestOverview.total) * 100 : 0}%` }}
+                  />
+                  <div
+                    className="bg-blue-400 h-full"
+                    style={{ width: `${requestOverview?.total ? (requestOverview.suggestions / requestOverview.total) * 100 : 0}%` }}
+                  />
+                  <div
+                    className="bg-green-400 h-full"
+                    style={{ width: `${requestOverview?.total ? (requestOverview.letters / requestOverview.total) * 100 : 0}%` }}
+                  />
                 </div>
               </div>
             </CardContent>
@@ -240,20 +280,29 @@ export default function AkimatDashboard() {
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
                   <span className="text-sm">Online</span>
-                  <span className="text-sm font-medium text-green-400">142</span>
+                  <span className="text-sm font-medium text-green-400">{surveillanceSummary?.online ?? 0}</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sm">Offline</span>
-                  <span className="text-sm font-medium text-red-400">8</span>
+                  <span className="text-sm font-medium text-red-400">{surveillanceSummary?.offline ?? 0}</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sm">Maintenance</span>
-                  <span className="text-sm font-medium text-amber-400">10</span>
+                  <span className="text-sm font-medium text-amber-400">{surveillanceSummary?.maintenance ?? 0}</span>
                 </div>
                 <div className="h-2 bg-secondary rounded-full mt-3 overflow-hidden flex">
-                  <div className="bg-green-400 h-full" style={{ width: "89%" }} />
-                  <div className="bg-red-400 h-full" style={{ width: "5%" }} />
-                  <div className="bg-amber-400 h-full" style={{ width: "6%" }} />
+                  <div
+                    className="bg-green-400 h-full"
+                    style={{ width: `${surveillanceSummary?.total ? (surveillanceSummary.online / surveillanceSummary.total) * 100 : 0}%` }}
+                  />
+                  <div
+                    className="bg-red-400 h-full"
+                    style={{ width: `${surveillanceSummary?.total ? (surveillanceSummary.offline / surveillanceSummary.total) * 100 : 0}%` }}
+                  />
+                  <div
+                    className="bg-amber-400 h-full"
+                    style={{ width: `${surveillanceSummary?.total ? (surveillanceSummary.maintenance / surveillanceSummary.total) * 100 : 0}%` }}
+                  />
                 </div>
               </div>
             </CardContent>
@@ -268,26 +317,48 @@ export default function AkimatDashboard() {
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
                   <span className="text-sm">From Developers</span>
-                  <span className="text-sm font-medium text-accent">7</span>
+                  <span className="text-sm font-medium text-accent">{reportsSummary?.developer ?? 0}</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sm">From Utilities</span>
-                  <span className="text-sm font-medium text-blue-400">4</span>
+                  <span className="text-sm font-medium text-blue-400">{reportsSummary?.utilities ?? 0}</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sm">From Industrialists</span>
-                  <span className="text-sm font-medium text-amber-400">3</span>
+                  <span className="text-sm font-medium text-amber-400">{reportsSummary?.industrialist ?? 0}</span>
                 </div>
                 <div className="h-2 bg-secondary rounded-full mt-3 overflow-hidden flex">
-                  <div className="bg-accent h-full" style={{ width: "50%" }} />
-                  <div className="bg-blue-400 h-full" style={{ width: "29%" }} />
-                  <div className="bg-amber-400 h-full" style={{ width: "21%" }} />
+                  <div
+                    className="bg-accent h-full"
+                    style={{ width: `${reportsSummary?.total ? (reportsSummary.developer / reportsSummary.total) * 100 : 0}%` }}
+                  />
+                  <div
+                    className="bg-blue-400 h-full"
+                    style={{ width: `${reportsSummary?.total ? (reportsSummary.utilities / reportsSummary.total) * 100 : 0}%` }}
+                  />
+                  <div
+                    className="bg-amber-400 h-full"
+                    style={{ width: `${reportsSummary?.total ? (reportsSummary.industrialist / reportsSummary.total) * 100 : 0}%` }}
+                  />
                 </div>
               </div>
             </CardContent>
           </Card>
         </div>
       </main>
+
+      <AkimatProfileSheet open={isProfileOpen} onOpenChange={setIsProfileOpen} />
+
+      <Sheet open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
+        <SheetContent side="left" className="w-full sm:max-w-md">
+          <SheetHeader className="text-left">
+            <SheetTitle>Akimat Settings</SheetTitle>
+            <SheetDescription>
+              Settings are intentionally left empty for now. Theme switching can be added later.
+            </SheetDescription>
+          </SheetHeader>
+        </SheetContent>
+      </Sheet>
     </div>
   )
 }
