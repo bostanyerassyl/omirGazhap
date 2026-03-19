@@ -42,6 +42,12 @@ export async function initializeMapView() {
   });
   map.addControl(new maplibregl.NavigationControl());
 
+  map.on('styleimagemissing', (e) => {
+    if (!e?.id || map.hasImage(e.id)) return;
+    const empty = new Uint8Array([0, 0, 0, 0]);
+    map.addImage(e.id, { width: 1, height: 1, data: empty });
+  });
+
   map.on('load', async () => {
     const draw = await setupDraw(map);
     const emptyFC = () => ({ type: 'FeatureCollection', features: [] });
