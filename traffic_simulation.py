@@ -36,8 +36,7 @@ def setup_intersection(supabase: Client):
         "type": "LineString",
         "geometry": {"type": "LineString", "coordinates": [[center_lon, center_lat + 0.001], [center_lon, center_lat - 0.001]]},
         "color": "green",
-        "title": "Улица Север-Юг",
-        "asset_id": cam_ns
+        "title": "Улица Север-Юг"
     }).execute()
     
     road_ew_id = str(uuid.uuid4())
@@ -46,8 +45,7 @@ def setup_intersection(supabase: Client):
         "type": "LineString",
         "geometry": {"type": "LineString", "coordinates": [[center_lon - 0.001, center_lat], [center_lon + 0.001, center_lat]]},
         "color": "red",
-        "title": "Улица Запад-Восток",
-        "asset_id": cam_ew
+        "title": "Улица Запад-Восток"
     }).execute()
     
     # 3. Камеры на карте (Точки)
