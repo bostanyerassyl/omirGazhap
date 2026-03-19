@@ -1064,13 +1064,17 @@ export async function setupDraw(map) {
 
   // Subscribe to Map Features updates from the simulator
   supabase.channel('map-features-sync')
-    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'Map Features' }, (payload) => {
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: '"Map Features"' }, (payload) => {
+      console.log('Realtime Map Features UPDATE received:', payload.new);
       const dbId = payload.new?.id;
       if (!dbId) return;
       
       // Find the local draw feature ID
       const drawId = [...drawIdToDbId.entries()].find(([k, v]) => v === dbId)?.[0];
-      if (!drawId) return;
+      if (!drawId) {
+        console.warn(`Feature ${dbId} not found in drawIdToDbId map!`);
+        return;
+      }
       
       // Sync color
       const newColor = payload.new.color ?? DEFAULT_FEATURE_COLOR;
@@ -1078,12 +1082,17 @@ export async function setupDraw(map) {
       
       // Sync icon immediately
       if (payload.new.type === 'Point' && payload.new.icon) {
-         updateIconMarker(map, drawId, payload.new.geometry.coordinates, payload.new.icon, payload.new.icon_url);
+         updateIconMarker(map, drawId, payload.new.geometry?.coordinates, payload.new.icon, payload.new.icon_url);
       }
       
+      // Force Mapbox Draw to re-eval styles and MapLibre to repaint
+      const currentFeat = draw.get(drawId);
+      if (currentFeat) draw.add(currentFeat);
       map.triggerRepaint();
     })
-    .subscribe();
+    .subscribe((status) => {
+      console.log('Map Features realtime status:', status);
+    });
 
   // Toolbar mode buttons
   document.querySelectorAll('.draw-btn').forEach(btn => {
