@@ -85,6 +85,17 @@ export function InteractiveMapView({ toolbarTop = 84 }: InteractiveMapViewProps)
               </div>
             </div>
             <textarea id="feature-desc" placeholder="Description..." />
+            <div id="traffic-light-section" className="section" style={{ display: "none" }}>
+              <div className="section-label">Traffic Light</div>
+              <div className="obs-actions">
+                <button className="traffic-state-btn" data-state="red" type="button">Red</button>
+                <button className="traffic-state-btn" data-state="yellow" type="button">Yellow</button>
+                <button className="traffic-state-btn" data-state="green" type="button">Green</button>
+              </div>
+              <div id="traffic-light-hint" className="obs-hint">
+                Switches are synced in real time across devices.
+              </div>
+            </div>
             <div id="observations-section" className="section" style={{ display: "none" }}>
               <div className="section-label">Observations</div>
               <div id="observations-role-hint" className="obs-hint" />

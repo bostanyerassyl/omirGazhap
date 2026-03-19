@@ -1,8 +1,10 @@
 import maplibregl from 'maplibre-gl';
 import { openBuildingSidebar } from './buildings.js';
 import { openFeatureSidebar, setupDraw } from './features.js';
-import { loadFriends } from './friends.js';
+import { addFriend, loadFriends, teardownFriends } from './friends.js';
 import { closeSidebar } from './sidebar.js';
+import { registerMapActionHandlers } from '../../features/map/model/map-actions';
+import { teardownTrafficLights } from './traffic-lights.js';
 
 function featureKey(feature) {
   const coords = feature.geometry?.coordinates?.[0]?.[0];
@@ -41,6 +43,118 @@ export async function initializeMapView() {
     zoom: 15
   });
   map.addControl(new maplibregl.NavigationControl());
+
+  let navStartMarker = null;
+  let navEndMarker = null;
+  let unregisterActions = null;
+
+  const clearRoute = () => {
+    if (map.getLayer('nav-route-line')) map.removeLayer('nav-route-line');
+    if (map.getSource('nav-route')) map.removeSource('nav-route');
+    if (navStartMarker) { navStartMarker.remove(); navStartMarker = null; }
+    if (navEndMarker) { navEndMarker.remove(); navEndMarker = null; }
+  };
+
+  const geocodeDestination = async (destination) => {
+    const params = new URLSearchParams({
+      q: destination,
+      format: 'jsonv2',
+      limit: '1',
+    });
+    const res = await fetch(`https://nominatim.openstreetmap.org/search?${params.toString()}`);
+    if (!res.ok) throw new Error(`Geocoding failed (${res.status})`);
+    const data = await res.json();
+    if (!Array.isArray(data) || !data.length) throw new Error('Destination not found');
+    const first = data[0];
+    return {
+      lon: Number(first.lon),
+      lat: Number(first.lat),
+      label: first.display_name,
+    };
+  };
+
+  const profileForMode = (mode) => {
+    if (mode === 'walk') return 'foot';
+    if (mode === 'bike') return 'bike';
+    if (mode === 'transit') return 'driving';
+    return 'driving';
+  };
+
+  const requestRoute = async ({ destination, mode }) => {
+    try {
+      const center = map.getCenter();
+      const start = [center.lng, center.lat];
+      const geocoded = await geocodeDestination(destination);
+      const end = [geocoded.lon, geocoded.lat];
+
+      const profile = profileForMode(mode);
+      const osrmUrl = `https://router.project-osrm.org/route/v1/${profile}/${start[0]},${start[1]};${end[0]},${end[1]}?overview=full&geometries=geojson`;
+      const routeRes = await fetch(osrmUrl);
+      if (!routeRes.ok) throw new Error(`Routing failed (${routeRes.status})`);
+      const routeData = await routeRes.json();
+      const route = routeData?.routes?.[0];
+      if (!route?.geometry?.coordinates?.length) throw new Error('No route found');
+
+      clearRoute();
+      map.addSource('nav-route', {
+        type: 'geojson',
+        data: {
+          type: 'Feature',
+          geometry: route.geometry,
+          properties: {},
+        },
+      });
+      map.addLayer({
+        id: 'nav-route-line',
+        type: 'line',
+        source: 'nav-route',
+        paint: {
+          'line-color': '#2563eb',
+          'line-width': 5,
+          'line-opacity': 0.9,
+        },
+      });
+
+      navStartMarker = new maplibregl.Marker({ color: '#22c55e' })
+        .setLngLat(start)
+        .addTo(map);
+      navEndMarker = new maplibregl.Marker({ color: '#ef4444' })
+        .setLngLat(end)
+        .addTo(map);
+
+      map.fitBounds([start, end], { padding: 80, maxZoom: 15, duration: 700 });
+
+      return {
+        ok: true,
+        distanceKm: route.distance / 1000,
+        durationMin: route.duration / 60,
+        destinationLabel: geocoded.label,
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        error: error?.message || 'Route build failed',
+      };
+    }
+  };
+
+  unregisterActions = registerMapActionHandlers({
+    requestRoute,
+    clearRoute,
+    addFriend: async ({ name, avatarUrl, latitude, longitude }) => {
+      const center = map.getCenter();
+      return addFriend({
+        name,
+        avatar_url: avatarUrl,
+        latitude: Number.isFinite(latitude) ? latitude : center.lat,
+        longitude: Number.isFinite(longitude) ? longitude : center.lng,
+      });
+    },
+    getMapCenter: () => {
+      const center = map.getCenter();
+      return { latitude: center.lat, longitude: center.lng };
+    },
+  });
 
   map.on('styleimagemissing', (e) => {
     if (!e?.id || map.hasImage(e.id)) return;
@@ -138,6 +252,10 @@ export async function initializeMapView() {
   });
 
   return () => {
+    clearRoute();
+    teardownFriends();
+    teardownTrafficLights();
+    unregisterActions?.();
     map.remove();
   };
 }

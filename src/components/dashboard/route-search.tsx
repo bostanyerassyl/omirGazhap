@@ -14,6 +14,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/utils/cn"
+import { clearMapRoute, requestMapRoute } from "@/features/map/model/map-actions"
 
 type TransportMode = "car" | "walk" | "bike" | "transit"
 
@@ -30,6 +31,8 @@ export function RouteSearch() {
   const [isListening, setIsListening] = useState(false)
   const [isSearching, setIsSearching] = useState(false)
   const [showRoute, setShowRoute] = useState(false)
+  const [routeInfo, setRouteInfo] = useState<{ minutes: number; km: number; destinationLabel: string } | null>(null)
+  const [routeError, setRouteError] = useState<string | null>(null)
 
   const handleVoiceInput = () => {
     setIsListening(!isListening)
@@ -45,16 +48,30 @@ export function RouteSearch() {
   const handleSearch = () => {
     if (destination) {
       setIsSearching(true)
-      setTimeout(() => {
+      setRouteError(null)
+      void requestMapRoute({ destination, mode: selectedMode }).then((result) => {
         setIsSearching(false)
+        if (!result.ok) {
+          setShowRoute(false)
+          setRouteError(result.error ?? "Failed to build route")
+          return
+        }
         setShowRoute(true)
-      }, 1500)
+        setRouteInfo({
+          minutes: Math.max(1, Math.round(result.durationMin ?? 0)),
+          km: Number((result.distanceKm ?? 0).toFixed(1)),
+          destinationLabel: result.destinationLabel ?? destination,
+        })
+      })
     }
   }
 
   const clearRoute = () => {
     setDestination("")
     setShowRoute(false)
+    setRouteInfo(null)
+    setRouteError(null)
+    clearMapRoute()
   }
 
   return (
@@ -64,7 +81,7 @@ export function RouteSearch() {
         {showRoute && (
           <div className="bg-card/95 backdrop-blur-sm border border-border rounded-lg p-4 animate-in slide-in-from-bottom-2">
             <div className="flex items-center justify-between mb-3">
-              <h4 className="font-medium text-foreground">Route to {destination}</h4>
+              <h4 className="font-medium text-foreground">Route to {routeInfo?.destinationLabel ?? destination}</h4>
               <Button
                 variant="ghost"
                 size="sm"
@@ -76,11 +93,11 @@ export function RouteSearch() {
             </div>
             <div className="grid grid-cols-3 gap-4 text-center">
               <div>
-                <p className="text-2xl font-bold text-accent">12</p>
+                <p className="text-2xl font-bold text-accent">{routeInfo?.minutes ?? 0}</p>
                 <p className="text-xs text-muted-foreground">minutes</p>
               </div>
               <div>
-                <p className="text-2xl font-bold text-foreground">3.2</p>
+                <p className="text-2xl font-bold text-foreground">{routeInfo?.km ?? 0}</p>
                 <p className="text-xs text-muted-foreground">km</p>
               </div>
               <div>
@@ -92,6 +109,12 @@ export function RouteSearch() {
               <Navigation className="size-4 mr-2" />
               Start Navigation
             </Button>
+          </div>
+        )}
+
+        {routeError && (
+          <div className="bg-card/95 backdrop-blur-sm border border-red-500/30 rounded-lg p-3 text-sm text-red-300">
+            {routeError}
           </div>
         )}
 
@@ -180,4 +203,3 @@ export function RouteSearch() {
     </div>
   )
 }
-

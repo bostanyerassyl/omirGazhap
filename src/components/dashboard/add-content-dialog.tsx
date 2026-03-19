@@ -13,10 +13,15 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import { addFriendToMap, getMapCenterPosition } from "@/features/map/model/map-actions"
 
 export function AddContentDialog() {
   const [open, setOpen] = useState(false)
-  const [friendSearch, setFriendSearch] = useState("")
+  const [friendName, setFriendName] = useState("")
+  const [friendAvatar, setFriendAvatar] = useState("")
+  const [friendLatitude, setFriendLatitude] = useState("")
+  const [friendLongitude, setFriendLongitude] = useState("")
+  const [friendStatus, setFriendStatus] = useState<string | null>(null)
   const [placeData, setPlaceData] = useState({
     name: "",
     description: "",
@@ -47,10 +52,28 @@ export function AddContentDialog() {
   }
 
   const handleAddFriend = () => {
-    if (friendSearch) {
-      setFriendSearch("")
-      setOpen(false)
-    }
+    const trimmedName = friendName.trim()
+    if (!trimmedName) return
+    setFriendStatus("Saving friend...")
+    const lat = friendLatitude.trim() ? Number(friendLatitude) : undefined
+    const lng = friendLongitude.trim() ? Number(friendLongitude) : undefined
+    void addFriendToMap({
+      name: trimmedName,
+      avatarUrl: friendAvatar.trim() || undefined,
+      latitude: Number.isFinite(lat) ? lat : undefined,
+      longitude: Number.isFinite(lng) ? lng : undefined,
+    }).then((result) => {
+      if (!result.ok) {
+        setFriendStatus(`Failed: ${result.error}`)
+        return
+      }
+      setFriendStatus("Friend added to map")
+      setFriendName("")
+      setFriendAvatar("")
+      setFriendLatitude("")
+      setFriendLongitude("")
+      setTimeout(() => setOpen(false), 500)
+    })
   }
 
   const handleAddPlace = () => {
@@ -94,33 +117,83 @@ export function AddContentDialog() {
 
           <TabsContent value="friends" className="mt-4 space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="friend-search" className="text-foreground">
-                Find by username or phone
+              <Label htmlFor="friend-name" className="text-foreground">
+                Friend Name
               </Label>
               <Input
-                id="friend-search"
-                placeholder="Enter username or phone number"
-                value={friendSearch}
-                onChange={(e) => setFriendSearch(e.target.value)}
+                id="friend-name"
+                placeholder="e.g., Aisha"
+                value={friendName}
+                onChange={(e) => setFriendName(e.target.value)}
                 className="bg-secondary border-border text-foreground"
               />
             </div>
-            
-            {friendSearch && (
+
+            <div className="space-y-2">
+              <Label htmlFor="friend-avatar" className="text-foreground">
+                Avatar URL (optional)
+              </Label>
+              <Input
+                id="friend-avatar"
+                placeholder="https://..."
+                value={friendAvatar}
+                onChange={(e) => setFriendAvatar(e.target.value)}
+                className="bg-secondary border-border text-foreground"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="friend-lat" className="text-foreground">Latitude</Label>
+                <Input
+                  id="friend-lat"
+                  placeholder="Auto from map center"
+                  value={friendLatitude}
+                  onChange={(e) => setFriendLatitude(e.target.value)}
+                  className="bg-secondary border-border text-foreground"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="friend-lng" className="text-foreground">Longitude</Label>
+                <Input
+                  id="friend-lng"
+                  placeholder="Auto from map center"
+                  value={friendLongitude}
+                  onChange={(e) => setFriendLongitude(e.target.value)}
+                  className="bg-secondary border-border text-foreground"
+                />
+              </div>
+            </div>
+
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => {
+                const center = getMapCenterPosition()
+                if (!center) {
+                  setFriendStatus("Map center unavailable")
+                  return
+                }
+                setFriendLatitude(center.latitude.toFixed(6))
+                setFriendLongitude(center.longitude.toFixed(6))
+              }}
+            >
+              Use Current Map Center
+            </Button>
+
+            {friendStatus && (
               <div className="p-3 bg-secondary/50 rounded-lg">
-                <p className="text-sm text-muted-foreground">
-                  Searching for &quot;{friendSearch}&quot;...
-                </p>
+                <p className="text-sm text-muted-foreground">{friendStatus}</p>
               </div>
             )}
 
             <Button 
               className="w-full bg-accent text-accent-foreground hover:bg-accent/90"
               onClick={handleAddFriend}
-              disabled={!friendSearch}
+              disabled={!friendName.trim()}
             >
               <Users className="size-4 mr-2" />
-              Send Friend Request
+              Add Friend to Map
             </Button>
           </TabsContent>
 
@@ -194,4 +267,3 @@ export function AddContentDialog() {
     </Dialog>
   )
 }
-

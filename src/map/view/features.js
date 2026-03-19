@@ -1,6 +1,7 @@
 import MapboxDraw from '@mapbox/mapbox-gl-draw';
 import maplibregl from 'maplibre-gl';
 import { supabase } from '../supabase.js';
+import { getTrafficLightState, initTrafficLights, setTrafficLightState } from './traffic-lights.js';
 import {
   dom, resetSidebar, openSidebar, renderBanner,
   getActiveBanner, getActiveContext, setActiveContext, setActiveBanner
@@ -491,6 +492,8 @@ export async function openFeatureSidebar(feature, draw, map) {
   activeFeature.properties.icon_url = iconUrl;
   setActiveIcon(icon);
 
+  setupTrafficLightUI({ dbId, draw, map, feature });
+
   await setupObservationsUI({
     feature,
     dbId,
@@ -543,6 +546,40 @@ export async function openFeatureSidebar(feature, draw, map) {
       dom.btnSave.classList.remove('saved');
     }, 1800);
   };
+}
+
+function setupTrafficLightUI({ dbId, draw, map, feature }) {
+  const section = document.getElementById('traffic-light-section');
+  const hint = document.getElementById('traffic-light-hint');
+  const buttons = Array.from(document.querySelectorAll('.traffic-state-btn'));
+  if (!section || !hint || !buttons.length) return;
+
+  if (feature.geometry.type !== 'Point') {
+    section.style.display = 'none';
+    return;
+  }
+  section.style.display = '';
+
+  const currentState = getTrafficLightState(dbId);
+  for (const btn of buttons) {
+    btn.classList.toggle('active', btn.dataset.state === currentState);
+    btn.onclick = async () => {
+      const state = btn.dataset.state;
+      if (!state) return;
+      hint.textContent = 'Saving state...';
+      const result = await setTrafficLightState(dbId, state);
+      if (!result.ok) {
+        hint.textContent = `Failed: ${result.error}`;
+        return;
+      }
+      for (const b of buttons) b.classList.toggle('active', b.dataset.state === state);
+      const color = state === 'red' ? '#ef4444' : state === 'yellow' ? '#f59e0b' : '#22c55e';
+      document.getElementById('feature-color').value = color;
+      safeSetFeatureProperty(draw, feature.id, 'color', color);
+      map.triggerRepaint();
+      hint.textContent = 'Synced across devices.';
+    };
+  }
 }
 
 function getObservationInputValues(role) {
@@ -1022,6 +1059,8 @@ export async function setupDraw(map) {
       }
     }
   }
+
+  await initTrafficLights({ draw, map });
 
   // Toolbar mode buttons
   document.querySelectorAll('.draw-btn').forEach(btn => {

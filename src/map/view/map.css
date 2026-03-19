@@ -380,3 +380,27 @@ body.sidebar-open #sidebar {
   color: #e2e8f0;
   cursor: pointer;
 }
+
+.traffic-state-btn {
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 8px;
+  background: #0f172a;
+  color: #e2e8f0;
+  cursor: pointer;
+}
+
+.traffic-state-btn.active[data-state='red'] {
+  background: #991b1b;
+  border-color: #ef4444;
+}
+
+.traffic-state-btn.active[data-state='yellow'] {
+  background: #92400e;
+  border-color: #f59e0b;
+}
+
+.traffic-state-btn.active[data-state='green'] {
+  background: #166534;
+  border-color: #22c55e;
+}
