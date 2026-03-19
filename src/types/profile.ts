@@ -44,4 +44,4 @@ export type ProfileCreateInput = {
   licenseNumber?: string | null
 }
 
-export type ProfileUpdateInput = Partial<ProfileCreateInput>
+export type ProfileUpdateInput = Partial<Omit<ProfileCreateInput, 'email'>>

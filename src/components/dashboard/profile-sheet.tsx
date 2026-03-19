@@ -26,7 +26,7 @@ interface UserProfile {
 }
 
 export function ProfileSheet() {
-  const { profile: authProfile, updateProfile } = useAuth()
+  const { profile: authProfile, updateEmail, updateProfile } = useAuth()
   const [profile, setProfile] = useState<UserProfile>({
     name: "Citizen User",
     email: "user@alatau.city",
@@ -70,9 +70,20 @@ export function ProfileSheet() {
     setIsSaving(true)
     setSaveError(null)
     setSaveSuccess(null)
+    const emailChanged = profile.email !== (authProfile?.email ?? '')
+
+    if (emailChanged) {
+      const emailResult = await updateEmail(profile.email)
+
+      if (emailResult.error) {
+        setIsSaving(false)
+        setSaveError(emailResult.error.message)
+        return
+      }
+    }
+
     const result = await updateProfile({
       fullName: profile.name,
-      email: profile.email,
       phone: profile.phone,
       address: profile.address,
       bio: profile.bio,
@@ -85,7 +96,11 @@ export function ProfileSheet() {
       return
     }
 
-    setSaveSuccess("Profile saved successfully.")
+    setSaveSuccess(
+      emailChanged
+        ? 'Profile saved. Check your inbox if email confirmation is required.'
+        : 'Profile saved successfully.',
+    )
     setIsEditing(false)
   }
 

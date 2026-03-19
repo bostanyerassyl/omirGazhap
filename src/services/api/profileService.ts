@@ -38,7 +38,6 @@ function normalizeProfile(record: ProfileRecord): Profile {
 function serializeProfileInput(data: ProfileCreateInput | ProfileUpdateInput) {
   const payload: Partial<ProfileRecord> = {}
 
-  if (data.email !== undefined) payload.email = data.email
   if (data.fullName !== undefined) payload.full_name = data.fullName
   if (data.role !== undefined) payload.role = data.role
   if (data.phone !== undefined) payload.phone = data.phone
@@ -183,6 +182,7 @@ export async function createProfile(
   try {
     const payload = {
       id: userId,
+      ...(initialData.email !== undefined ? { email: initialData.email } : {}),
       ...serializeProfileInput(initialData),
     }
 

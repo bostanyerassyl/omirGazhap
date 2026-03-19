@@ -116,6 +116,26 @@ export async function signOut(): Promise<AuthResult<null>> {
   }
 }
 
+export async function updateAuthEmail(email: string): Promise<AuthResult<User>> {
+  try {
+    const { data, error } = await supabase.auth.updateUser({ email })
+
+    if (error) {
+      return {
+        data: null,
+        error,
+      }
+    }
+
+    return {
+      data: data.user,
+      error: null,
+    }
+  } catch (error) {
+    return toAuthError<User>(error, 'auth.updateEmail')
+  }
+}
+
 export async function restoreSession(): Promise<AuthResult<AuthSessionData>> {
   try {
     const { data, error } = await supabase.auth.getSession()

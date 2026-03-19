@@ -20,6 +20,7 @@ import {
   signOut,
   signUp,
   subscribeToAuthChanges,
+  updateAuthEmail,
   type SignInPayload,
   type SignUpPayload,
 } from '@/services/api/authService'
@@ -35,6 +36,7 @@ type AuthContextValue = AuthState & {
   logout: () => Promise<AuthResult<null>>
   restoreSession: () => Promise<AuthResult<AuthHydratedSessionData>>
   updateProfile: (data: ProfileUpdateInput) => Promise<AuthResult<AuthHydratedSessionData>>
+  updateEmail: (email: string) => Promise<AuthResult<AuthHydratedSessionData>>
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -220,6 +222,50 @@ export function AuthProvider({ children }: PropsWithChildren) {
     [state.user],
   )
 
+  const updateEmail = useCallback(
+    async (email: string) => {
+      if (!state.user) {
+        return {
+          data: null,
+          error: new Error('User is not authenticated'),
+        }
+      }
+
+      const emailResult = await updateAuthEmail(email)
+
+      if (emailResult.error) {
+        return {
+          data: null,
+          error: emailResult.error,
+        }
+      }
+
+      const profileResult = await getProfile(state.user.id)
+      const nextUser = emailResult.data ?? state.user
+      const nextProfile =
+        profileResult.error || !profileResult.data
+          ? state.profile
+          : profileResult.data
+
+      setState({
+        user: nextUser,
+        profile: nextProfile,
+        role: nextProfile?.role ?? null,
+        loading: false,
+      })
+
+      return {
+        data: {
+          session: null,
+          user: nextUser,
+          profile: nextProfile,
+        },
+        error: null,
+      }
+    },
+    [state.profile, state.user],
+  )
+
   useEffect(() => {
     void restoreSession()
 
@@ -245,8 +291,9 @@ export function AuthProvider({ children }: PropsWithChildren) {
       logout,
       restoreSession,
       updateProfile,
+      updateEmail,
     }),
-    [login, logout, register, restoreSession, state, updateProfile],
+    [login, logout, register, restoreSession, state, updateEmail, updateProfile],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
