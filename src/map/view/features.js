@@ -493,6 +493,7 @@ export async function openFeatureSidebar(feature, draw, map) {
   setActiveIcon(icon);
 
   setupTrafficLightUI({ dbId, draw, map, feature });
+  setupCameraUI({ feature, role: getCurrentRole() });
 
   await setupObservationsUI({
     feature,
@@ -579,6 +580,37 @@ function setupTrafficLightUI({ dbId, draw, map, feature }) {
       map.triggerRepaint();
       hint.textContent = 'Synced across devices.';
     };
+  }
+}
+
+function setupCameraUI({ feature, role }) {
+  let container = document.getElementById('camera-feed-section');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'camera-feed-section';
+    container.style.marginTop = '20px';
+    const targetDiv = dom.featureSection; // Append to the bottom of the section
+    if (targetDiv) {
+      targetDiv.appendChild(container);
+    }
+  }
+
+  const isCamera = feature.properties?.icon === '📹' || 
+                   (feature.properties?.title && feature.properties.title.toLowerCase().includes('камер'));
+
+  if (role === 'admin' && isCamera) {
+    container.style.display = 'block';
+    container.innerHTML = `
+      <div class="sidebar-section" style="padding: 15px; background: #1e293b; border-radius: 8px;">
+        <h3 style="margin-top: 0; color: #fff; font-size: 14px; margin-bottom: 12px;">🔴 Live Traffic Camera (Admin)</h3>
+        <div style="position: relative; width: 100%; padding-bottom: 75%; height: 0; overflow: hidden; border-radius: 6px; background: #000;">
+          <iframe width="640" height="480" src="https://rtsp.me/embed/KPbwo57M/" frameborder="0" allowfullscreen style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"></iframe>
+        </div>
+      </div>
+    `;
+  } else {
+    container.style.display = 'none';
+    container.innerHTML = '';
   }
 }
 

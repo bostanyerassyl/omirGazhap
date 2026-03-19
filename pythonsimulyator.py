@@ -17,7 +17,7 @@ SUPABASE_KEY = 'sb_publishable_RzNSGBsRw82CiiLcFkJJhg_gcEJLRvy'
 CENTER_LAT = 43.673943872429916
 CENTER_LON = 77.10766431791033
 
-def generate_random_point(center_lat, center_lon, radius_km=10.0):
+def generate_random_point(center_lat, center_lon, radius_km=25.0):
     """Генерация случайной точки в заданном радиусе (в км) от центра."""
     earth_radius = 6371.0
     

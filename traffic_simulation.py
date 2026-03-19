@@ -26,7 +26,7 @@ def setup_intersection(supabase: Client):
     light_e = supabase.table("assets").insert({"type": "traffic_light", "status": "active"}).execute().data[0]['id']
     light_w = supabase.table("assets").insert({"type": "traffic_light", "status": "active"}).execute().data[0]['id']
     
-    center_lon, center_lat = 77.1100, 43.6730
+    center_lon, center_lat = 77.0227, 43.6402
     offset = 0.00015 # Небольшой отступ от центра для иконок
 
     # 2. Дороги (LineStrings)
@@ -34,7 +34,14 @@ def setup_intersection(supabase: Client):
     supabase.table("Map Features").insert({
         "id": road_ns_id,
         "type": "LineString",
-        "geometry": {"type": "LineString", "coordinates": [[center_lon, center_lat + 0.001], [center_lon, center_lat - 0.001]]},
+        "geometry": {
+            "type": "LineString", 
+            "coordinates": [
+                [77.02466908552145, 43.65513503596449],
+                [77.02270926806176, 43.64023471443309],
+                [77.01804993022944, 43.625010048526775]
+            ]
+        },
         "color": "#22c55e",
         "title": "Улица Север-Юг"
     }).execute()
@@ -43,37 +50,45 @@ def setup_intersection(supabase: Client):
     supabase.table("Map Features").insert({
         "id": road_ew_id,
         "type": "LineString",
-        "geometry": {"type": "LineString", "coordinates": [[center_lon - 0.001, center_lat], [center_lon + 0.001, center_lat]]},
+        "geometry": {
+            "type": "LineString", 
+            "coordinates": [
+                [76.99483324968236, 43.64000391298504],
+                [77.017337610416, 43.6419261860548],
+                [77.02265011524611, 43.64085826416448],
+                [77.05150811443713, 43.63426612689389],
+                [77.05150811443713, 43.63426612689389]
+            ]
+        },
         "color": "#ef4444",
-        "title": "Улица Запад-Восток"
+        "title": "Улица Северо-Запад"
     }).execute()
     
-    # 3. Камеры на карте (Точки)
+    # 3. Камеры на карте (Точки) вблизи перекрестка
     supabase.table("Map Features").insert([
         {
             "id": str(uuid.uuid4()), "type": "Point", "asset_id": cam_ns,
-            "geometry": {"type": "Point", "coordinates": [center_lon, center_lat + 0.0005]},
+            "geometry": {"type": "Point", "coordinates": [center_lon, center_lat + 0.0008]},
             "title": "Камера (С-Ю)", "icon": "📹"
         },
         {
             "id": str(uuid.uuid4()), "type": "Point", "asset_id": cam_ew,
-            "geometry": {"type": "Point", "coordinates": [center_lon + 0.0005, center_lat]},
-            "title": "Камера (З-В)", "icon": "📹"
+            "geometry": {"type": "Point", "coordinates": [center_lon - 0.0008, center_lat + 0.0002]},
+            "title": "Камера (Сев-Зап)", "icon": "📹"
         }
     ]).execute()
 
-    # 4. СВЕТОФОРЫ: 4 точки вокруг центра
-    # Сохраняем ID фишек на карте для обновлений (через asset_id будем искать или вернем списком)
+    # 4. СВЕТОФОРЫ: 4 точки вокруг центра пересечения
     map_light_n = str(uuid.uuid4())
     map_light_s = str(uuid.uuid4())
     map_light_e = str(uuid.uuid4())
     map_light_w = str(uuid.uuid4())
 
     supabase.table("Map Features").insert([
-        {"id": map_light_n, "type": "Point", "asset_id": light_n, "icon": "🟡", "title": "Светофор Север", "geometry": {"type": "Point", "coordinates": [center_lon, center_lat + offset]}},
-        {"id": map_light_s, "type": "Point", "asset_id": light_s, "icon": "🟡", "title": "Светофор Юг", "geometry": {"type": "Point", "coordinates": [center_lon, center_lat - offset]}},
-        {"id": map_light_e, "type": "Point", "asset_id": light_e, "icon": "🟡", "title": "Светофор Восток", "geometry": {"type": "Point", "coordinates": [center_lon + offset, center_lat]}},
-        {"id": map_light_w, "type": "Point", "asset_id": light_w, "icon": "🟡", "title": "Светофор Запад", "geometry": {"type": "Point", "coordinates": [center_lon - offset, center_lat]}}
+        {"id": map_light_n, "type": "Point", "asset_id": light_n, "icon": "🟡", "title": "Светофор Север", "geometry": {"type": "Point", "coordinates": [center_lon + 0.0001, center_lat + offset]}},
+        {"id": map_light_s, "type": "Point", "asset_id": light_s, "icon": "🟡", "title": "Светофор Юг", "geometry": {"type": "Point", "coordinates": [center_lon - 0.0001, center_lat - offset]}},
+        {"id": map_light_e, "type": "Point", "asset_id": light_e, "icon": "🟡", "title": "Светофор Восток", "geometry": {"type": "Point", "coordinates": [center_lon + offset, center_lat - 0.0001]}},
+        {"id": map_light_w, "type": "Point", "asset_id": light_w, "icon": "🟡", "title": "Светофор Запад", "geometry": {"type": "Point", "coordinates": [center_lon - offset, center_lat + 0.0001]}}
     ]).execute()
     
     logging.info("Перекресток (4 светофора) успешно проинициализирован!")

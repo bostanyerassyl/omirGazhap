@@ -185,22 +185,31 @@ export function CamerasPanel({ cameras }: CamerasPanelProps) {
             <div className="flex-1 bg-black relative">
               <div className="absolute inset-0 flex items-center justify-center">
                 {/* Simulated live feed */}
-                <div className="w-full h-full bg-gradient-to-br from-secondary/50 to-background/50 flex items-center justify-center relative">
-                  <Video className="h-16 w-16 text-muted-foreground/30" />
+                <div className="w-full h-full bg-black flex items-center justify-center relative">
+                  {isPlaying ? (
+                    <iframe 
+                      src="https://rtsp.me/embed/KPbwo57M/" 
+                      frameBorder="0" 
+                      allowFullScreen 
+                      className="w-full h-full absolute inset-0 border-none"
+                    />
+                  ) : (
+                    <Video className="h-16 w-16 text-muted-foreground/30" />
+                  )}
                   
                   {/* Timestamp */}
-                  <div className="absolute top-4 left-4 bg-black/50 px-2 py-1 rounded text-xs text-white font-mono">
+                  <div className="absolute top-4 left-4 bg-black/70 px-2 py-1 rounded text-xs text-white font-mono z-10 pointer-events-none">
                     {new Date().toLocaleTimeString()}
                   </div>
 
                   {/* Camera name */}
-                  <div className="absolute top-4 right-4 bg-black/50 px-2 py-1 rounded text-xs text-white">
+                  <div className="absolute top-4 right-4 bg-black/70 px-2 py-1 rounded text-xs text-white z-10 pointer-events-none">
                     {selectedCamera.name}
                   </div>
 
                   {/* REC indicator */}
                   {isPlaying && (
-                    <div className="absolute bottom-4 left-4 flex items-center gap-2 bg-black/50 px-2 py-1 rounded">
+                    <div className="absolute bottom-4 left-4 flex items-center gap-2 bg-black/70 px-2 py-1 rounded z-10 pointer-events-none">
                       <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
                       <span className="text-xs text-white font-mono">LIVE</span>
                     </div>
