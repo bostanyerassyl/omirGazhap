@@ -75,7 +75,7 @@ def setup_infrastructure(supabase: Client):
                     "coordinates": [lon, lat] # Внимание: долгота первая!
                 },
                 "title": f"{type_names[sensor_type]} #{i}",
-                "description": asset_id # Связываем карту и логику
+                "asset_id": asset_id # Связываем карту и логику
             }
             supabase.table("Map Features").insert(feature_data).execute()
             
