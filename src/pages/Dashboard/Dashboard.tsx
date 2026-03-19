@@ -1,5 +1,6 @@
 import { useState } from "react"
 import { CityMap } from "@/components/dashboard/city-map"
+import type { FilterState } from "@/components/dashboard/city-map"
 import { ProfileSheet } from "@/components/dashboard/profile-sheet"
 import { MessagesPanel } from "@/components/dashboard/messages-panel"
 import { AddContentDialog } from "@/components/dashboard/add-content-dialog"
@@ -17,14 +18,6 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet"
-
-interface FilterState {
-  ramps: boolean
-  scooters: boolean
-  friends: boolean
-  events: boolean
-  buses: boolean
-}
 
 // Events Sheet Component
 function EventsSheet({ events }: { events: Array<{ id: string; title: string; date: string; time: string; location: string }> }) {
@@ -131,4 +124,3 @@ export default function DashboardPage() {
     </div>
   )
 }
-

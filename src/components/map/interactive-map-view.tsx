@@ -10,6 +10,16 @@ interface InteractiveMapViewProps {
 
 export function InteractiveMapView({ toolbarTop = 84 }: InteractiveMapViewProps) {
   const { role } = useAuth()
+  const resolvedRole = role ?? ""
+  const canEditMap = new Set([
+    "admin",
+    "akimat",
+    "government_official",
+    "government-official",
+    "developer",
+    "utilities",
+    "industrialist",
+  ]).has(resolvedRole)
 
   useEffect(() => {
     let teardown: null | (() => void) = null
@@ -31,13 +41,15 @@ export function InteractiveMapView({ toolbarTop = 84 }: InteractiveMapViewProps)
     <div className="city-map-root">
       <div id="map" data-role={role ?? ""} />
 
-      <div id="draw-toolbar" style={{ top: `${toolbarTop}px` }}>
-        <button className="draw-btn" data-mode="simple_select">Select</button>
-        <button className="draw-btn" data-mode="draw_point">Point</button>
-        <button className="draw-btn" data-mode="draw_line_string">Line</button>
-        <button className="draw-btn" data-mode="draw_polygon">Polygon</button>
-        <button id="draw-delete">Delete</button>
-      </div>
+      {canEditMap ? (
+        <div id="draw-toolbar" style={{ top: `${toolbarTop}px` }}>
+          <button className="draw-btn" data-mode="simple_select">Select</button>
+          <button className="draw-btn" data-mode="draw_point">Point</button>
+          <button className="draw-btn" data-mode="draw_line_string">Line</button>
+          <button className="draw-btn" data-mode="draw_polygon">Polygon</button>
+          <button id="draw-delete">Delete</button>
+        </div>
+      ) : null}
 
       <aside id="sidebar">
         <div id="sidebar-banner">
@@ -77,6 +89,7 @@ export function InteractiveMapView({ toolbarTop = 84 }: InteractiveMapViewProps)
                   <button className="icon-btn" data-icon="🏠">🏠</button>
                   <button className="icon-btn" data-icon="🏢">🏢</button>
                   <button className="icon-btn" data-icon="⚠️">⚠️</button>
+                  <button className="icon-btn" data-icon="🚦">🚦</button>
                   <button className="icon-btn" data-icon="🔴">🔴</button>
                   <button className="icon-btn" data-icon="🟢">🟢</button>
                   <button className="icon-btn" data-icon="custom">Custom</button>

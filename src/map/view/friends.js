@@ -5,6 +5,7 @@ import { dom, resetSidebar, openSidebar, renderBanner, setActiveContext, setActi
 const friendMarkers = new Map();
 let friendsChannel = null;
 let activeMap = null;
+let friendsVisible = true;
 
 export async function loadFriends(map) {
   activeMap = map;
@@ -51,6 +52,7 @@ function upsertFriendMarker(map, friend) {
     }
     if (name) name.textContent = friend.name;
     existing.setLngLat([friend.longitude, friend.latitude]);
+    existing.getElement().style.display = friendsVisible ? '' : 'none';
     return;
   }
 
@@ -68,6 +70,7 @@ function upsertFriendMarker(map, friend) {
   el.addEventListener('click', e => { e.stopPropagation(); openFriendSidebar(friend); });
   const marker = new maplibregl.Marker({ element: el, anchor: 'bottom' })
     .setLngLat([friend.longitude, friend.latitude]).addTo(map);
+  marker.getElement().style.display = friendsVisible ? '' : 'none';
   friendMarkers.set(friend.id, marker);
 }
 
@@ -105,6 +108,13 @@ export function teardownFriends() {
     friendsChannel = null;
   }
   activeMap = null;
+}
+
+export function setFriendsVisibility(nextVisible) {
+  friendsVisible = Boolean(nextVisible);
+  for (const marker of friendMarkers.values()) {
+    marker.getElement().style.display = friendsVisible ? '' : 'none';
+  }
 }
 
 function openFriendSidebar(friend) {

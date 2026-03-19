@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { Camera, Mail, Phone, MapPin, Save, User } from "lucide-react"
+import { Camera, Mail, Phone, MapPin, Save, User, LogOut } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/sheet"
 import { useAuth } from "@/features/auth/model/AuthProvider"
 import { storageService } from "@/services/domain/storageService"
+import { useNavigate } from "react-router-dom"
 
 interface UserProfile {
   name: string
@@ -27,7 +28,8 @@ interface UserProfile {
 }
 
 export function ProfileSheet() {
-  const { user, profile: authProfile, updateEmail, updateProfile } = useAuth()
+  const { user, profile: authProfile, updateEmail, updateProfile, logout } = useAuth()
+  const navigate = useNavigate()
   const [profile, setProfile] = useState<UserProfile>({
     name: "Citizen User",
     email: "user@alatau.city",
@@ -121,6 +123,11 @@ export function ProfileSheet() {
         : 'Profile saved successfully.',
     )
     setIsEditing(false)
+  }
+
+  const handleLogout = async () => {
+    await logout()
+    navigate("/login", { replace: true })
   }
 
   return (
@@ -282,12 +289,22 @@ export function ProfileSheet() {
                 </Button>
               </>
             ) : (
-              <Button 
-                className="w-full bg-accent text-accent-foreground hover:bg-accent/90"
-                onClick={() => setIsEditing(true)}
-              >
-                Edit Profile
-              </Button>
+              <>
+                <Button 
+                  className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90"
+                  onClick={() => setIsEditing(true)}
+                >
+                  Edit Profile
+                </Button>
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => void handleLogout()}
+                >
+                  <LogOut className="size-4 mr-2" />
+                  Logout
+                </Button>
+              </>
             )}
           </div>
         </div>
@@ -295,4 +312,3 @@ export function ProfileSheet() {
     </Sheet>
   )
 }
-
