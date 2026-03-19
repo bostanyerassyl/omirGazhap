@@ -93,6 +93,7 @@ export default function AdminDashboard() {
   const [dialogType, setDialogType] = useState<AdminReviewTarget | null>(null)
   const [adminNote, setAdminNote] = useState("")
   const [adminNoteError, setAdminNoteError] = useState<string | null>(null)
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false)
 
   const featureRequests = data?.featureRequests ?? []
   const locationRequests = data?.locationRequests ?? []
@@ -139,7 +140,7 @@ export default function AdminDashboard() {
     setAdminNoteError(null)
   }
 
-  const handleAction = (action: "approve" | "reject") => {
+  const handleAction = async (action: "approve" | "reject") => {
     const validationResult = adminReviewSchema.safeParse({
       note: adminNote || undefined,
     })
@@ -153,7 +154,20 @@ export default function AdminDashboard() {
       return
     }
 
-    reviewAdminItem(dialogType, selectedItem.id, action)
+    setIsSubmittingReview(true)
+    const reviewResult = await reviewAdminItem(
+      dialogType,
+      selectedItem.id,
+      action,
+      adminNote || undefined,
+    )
+    setIsSubmittingReview(false)
+
+    if (reviewResult.error) {
+      setAdminNoteError(reviewResult.error.message)
+      return
+    }
+
     setSelectedItem(null)
     setDialogType(null)
     setAdminNote("")
@@ -585,17 +599,19 @@ export default function AdminDashboard() {
             <Button
               variant="outline"
               className="gap-2 border-red-500/50 text-red-400 hover:bg-red-500/10"
-              onClick={() => handleAction("reject")}
+              onClick={() => void handleAction("reject")}
+              disabled={isSubmittingReview}
             >
               <XCircle className="h-4 w-4" />
-              Reject
+              {isSubmittingReview ? "Saving..." : "Reject"}
             </Button>
             <Button
               className="gap-2 bg-green-500 text-white hover:bg-green-600"
-              onClick={() => handleAction("approve")}
+              onClick={() => void handleAction("approve")}
+              disabled={isSubmittingReview}
             >
               <CheckCircle2 className="h-4 w-4" />
-              Approve
+              {isSubmittingReview ? "Saving..." : "Approve"}
             </Button>
           </DialogFooter>
         </DialogContent>

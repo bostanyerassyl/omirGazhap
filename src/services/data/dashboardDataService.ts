@@ -1,4 +1,5 @@
 import { assetService } from '@/services/domain/assetService'
+import { adminService } from '@/services/domain/adminService'
 import { caseService } from '@/services/domain/caseService'
 import { eventService } from '@/services/domain/eventService'
 import { observationService } from '@/services/domain/observationService'
@@ -309,12 +310,33 @@ function buildLocationRequests(
       lng: 76.889709 + index / 1000,
     },
     photos: 0,
-    status: 'pending',
+    status: item.reviewStatus,
   }))
 }
 
-function buildRoleRequests(): RoleRequest[] {
-  return []
+function buildRoleRequests(
+  roleRequests: Awaited<ReturnType<typeof adminService.listRoleRequests>>['data'],
+  profilesMap: Record<string, Profile>,
+): RoleRequest[] {
+  return (roleRequests ?? []).slice(0, 12).map((item) => {
+    const requester = profilesMap[item.user_id]
+    const email = requester?.email ?? 'unknown@system.local'
+    const fullName = requester?.fullName || email
+    const username = email.split('@')[0] || fullName.toLowerCase().replace(/\s+/g, '.')
+
+    return {
+      id: item.id,
+      username,
+      fullName,
+      email,
+      requestedRole: item.requested_role === 'resident' ? 'resident' : item.requested_role as Role,
+      currentRole: requester?.role ?? 'resident',
+      company: item.company ?? requester?.companyName ?? 'Not provided',
+      documents: item.documents ?? [],
+      date: formatTimestamp(item.created_at),
+      status: item.status ?? 'pending',
+    }
+  })
 }
 
 async function loadActorProfiles(
@@ -358,11 +380,24 @@ async function buildDashboardData(
   const shouldLoadAdminProfiles = role === 'admin'
   const shouldLoadTotalUsers = role === 'admin'
   const shouldLoadCurrentProfile = role === 'industrialist' && Boolean(userId)
+  const shouldLoadRoleRequests = role === 'admin'
+
+  const roleRequestsResult = shouldLoadRoleRequests
+    ? await adminService.listRoleRequests()
+    : { data: [], error: null }
+
+  if (roleRequestsResult.error) {
+    return {
+      data: emptyData,
+      error: roleRequestsResult.error,
+    }
+  }
 
   const actorProfilesResult = shouldLoadAdminProfiles
     ? await loadActorProfiles([
         ...cases.map((item) => item.createdBy),
         ...observations.map((item) => item.createdBy),
+        ...(roleRequestsResult.data ?? []).map((item) => item.user_id),
       ])
     : { data: {}, error: null }
 
@@ -427,7 +462,7 @@ async function buildDashboardData(
         totalUsers,
         featureRequests: buildFeatureRequests(cases, events, profilesMap),
         locationRequests: buildLocationRequests(observations, profilesMap),
-        roleRequests: buildRoleRequests(),
+        roleRequests: buildRoleRequests(roleRequestsResult.data, profilesMap),
       },
     },
     error: null,

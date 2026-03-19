@@ -1,3 +1,5 @@
+import type { AdminRequestStatus } from './dashboard'
+
 export type ObservationItem = {
   id: string
   assetId: string | null
@@ -7,4 +9,5 @@ export type ObservationItem = {
   createdBy: string | null
   timestamp: string
   payload: Record<string, unknown>
+  reviewStatus: AdminRequestStatus
 }

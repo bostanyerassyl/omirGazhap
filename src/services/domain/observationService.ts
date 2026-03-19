@@ -1,6 +1,7 @@
 import { supabase } from '@/services/supabaseClient'
 import { logger } from '@/services/logger'
 import type { AuthResult, Role } from '@/types/auth'
+import type { AdminRequestStatus } from '@/types/dashboard'
 import type { ObservationItem } from '@/types/observation'
 import { toError } from '@/utils/error'
 
@@ -12,6 +13,7 @@ type ObservationRecord = {
   created_by: string | null
   timestamp: string | null
   payload: Record<string, unknown> | null
+  review_status: AdminRequestStatus | null
   locations?: {
     name: string | null
   } | null
@@ -27,6 +29,7 @@ function mapObservation(record: ObservationRecord): ObservationItem {
     createdBy: record.created_by,
     timestamp: record.timestamp ?? '',
     payload: record.payload ?? {},
+    reviewStatus: record.review_status ?? 'pending',
   }
 }
 

@@ -8,8 +8,10 @@ import {
   type PropsWithChildren,
 } from 'react'
 import { useAuth } from '@/features/auth/model/AuthProvider'
+import { adminService } from '@/services/domain/adminService'
 import { getDashboardData } from '@/services/data/dashboardDataService'
 import { logger } from '@/services/logger'
+import type { AuthResult } from '@/types/auth'
 import type {
   AdminReviewAction,
   AdminReviewTarget,
@@ -27,7 +29,8 @@ type AppDataContextValue = {
     target: AdminReviewTarget,
     id: string,
     action: AdminReviewAction,
-  ) => void
+    note?: string,
+  ) => Promise<AuthResult<null>>
 }
 
 const AppDataContext = createContext<AppDataContextValue | null>(null)
@@ -83,51 +86,30 @@ export function AppDataProvider({ children }: PropsWithChildren) {
           }
         })
       },
-      reviewAdminItem(target, id, action) {
-        const nextStatus = action === 'approve' ? 'approved' : 'rejected'
-
-        setData((current) => {
-          if (!current) {
-            return current
-          }
-
-          if (target === 'request') {
-            return {
-              ...current,
-              admin: {
-                ...current.admin,
-                featureRequests: current.admin.featureRequests.map((item) =>
-                  item.id === id ? { ...item, status: nextStatus } : item,
-                ),
-              },
-            }
-          }
-
-          if (target === 'location') {
-            return {
-              ...current,
-              admin: {
-                ...current.admin,
-                locationRequests: current.admin.locationRequests.map((item) =>
-                  item.id === id ? { ...item, status: nextStatus } : item,
-                ),
-              },
-            }
-          }
-
+      async reviewAdminItem(target, id, action, note) {
+        if (!user) {
           return {
-            ...current,
-            admin: {
-              ...current.admin,
-              roleRequests: current.admin.roleRequests.map((item) =>
-                item.id === id ? { ...item, status: nextStatus } : item,
-              ),
-            },
+            data: null,
+            error: new Error('User is not authenticated'),
           }
-        })
+        }
+
+        const result = await adminService.reviewItem(
+          target,
+          id,
+          action,
+          note,
+          user.id,
+        )
+
+        if (!result.error) {
+          await loadData()
+        }
+
+        return result
       },
     }),
-    [data, error, loadData, loading],
+    [data, loadData, loading, user],
   )
 
   return (
