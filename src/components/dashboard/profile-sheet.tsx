@@ -15,6 +15,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet"
 import { useAuth } from "@/features/auth/model/AuthProvider"
+import { storageService } from "@/services/domain/storageService"
 
 interface UserProfile {
   name: string
@@ -26,7 +27,7 @@ interface UserProfile {
 }
 
 export function ProfileSheet() {
-  const { profile: authProfile, updateEmail, updateProfile } = useAuth()
+  const { user, profile: authProfile, updateEmail, updateProfile } = useAuth()
   const [profile, setProfile] = useState<UserProfile>({
     name: "Citizen User",
     email: "user@alatau.city",
@@ -39,6 +40,7 @@ export function ProfileSheet() {
   const [isSaving, setIsSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null)
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false)
 
   useEffect(() => {
     if (!authProfile) {
@@ -55,15 +57,32 @@ export function ProfileSheet() {
     })
   }, [authProfile])
 
-  const handleAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (file) {
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        setProfile(prev => ({ ...prev, avatar: reader.result as string }))
-      }
-      reader.readAsDataURL(file)
+
+    if (!file || !user) {
+      return
     }
+
+    setSaveError(null)
+    setSaveSuccess(null)
+    setIsUploadingAvatar(true)
+
+    const uploadResult = await storageService.uploadAvatar(user.id, file)
+
+    setIsUploadingAvatar(false)
+    e.target.value = ''
+
+    if (uploadResult.error) {
+      setSaveError(uploadResult.error.message)
+      return
+    }
+
+    setProfile((prev) => ({
+      ...prev,
+      avatar: uploadResult.data ?? prev.avatar,
+    }))
+    setSaveSuccess('Avatar uploaded. Save the profile to persist the change.')
   }
 
   const handleSave = async () => {
@@ -155,11 +174,15 @@ export function ProfileSheet() {
                   type="file"
                   accept="image/*"
                   className="sr-only"
-                  onChange={handleAvatarUpload}
+                  onChange={(event) => {
+                    void handleAvatarUpload(event)
+                  }}
                 />
               </label>
             </div>
-            <p className="text-xs text-muted-foreground">Click camera to upload photo</p>
+            <p className="text-xs text-muted-foreground">
+              {isUploadingAvatar ? 'Uploading avatar...' : 'Click camera to upload photo'}
+            </p>
           </div>
 
           {/* Profile form */}
@@ -252,10 +275,10 @@ export function ProfileSheet() {
                 <Button 
                   className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90"
                   onClick={handleSave}
-                  disabled={isSaving}
+                  disabled={isSaving || isUploadingAvatar}
                 >
                   <Save className="size-4 mr-2" />
-                  {isSaving ? 'Saving...' : 'Save'}
+                  {isSaving ? 'Saving...' : isUploadingAvatar ? 'Uploading...' : 'Save'}
                 </Button>
               </>
             ) : (

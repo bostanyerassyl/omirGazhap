@@ -17,6 +17,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { FieldGroup, Field, FieldLabel } from "@/components/ui/field"
 import { useAuth } from "@/features/auth/model/AuthProvider"
+import { storageService } from "@/services/domain/storageService"
 import {
   Sheet,
   SheetContent,
@@ -30,7 +31,8 @@ export function DeveloperProfile() {
   const [isSaving, setIsSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null)
-  const { logout, profile: authProfile, updateEmail, updateProfile } = useAuth()
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false)
+  const { logout, user, profile: authProfile, updateEmail, updateProfile } = useAuth()
   const [profile, setProfile] = useState({
     name: "Alatau Development Corp",
     email: "contact@alataudev.kz",
@@ -39,6 +41,7 @@ export function DeveloperProfile() {
     address: "15 Business Center Avenue, Almaty",
     licenseNumber: "DEV-2024-00123",
     bio: "Leading construction and development company specializing in smart city infrastructure and sustainable building solutions.",
+    avatar: "",
   })
 
   useEffect(() => {
@@ -54,8 +57,37 @@ export function DeveloperProfile() {
       address: authProfile.address,
       licenseNumber: authProfile.licenseNumber,
       bio: authProfile.bio,
+      avatar: authProfile.avatarUrl,
     })
   }, [authProfile])
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+
+    if (!file || !user) {
+      return
+    }
+
+    setSaveError(null)
+    setSaveSuccess(null)
+    setIsUploadingAvatar(true)
+
+    const uploadResult = await storageService.uploadAvatar(user.id, file)
+
+    setIsUploadingAvatar(false)
+    e.target.value = ''
+
+    if (uploadResult.error) {
+      setSaveError(uploadResult.error.message)
+      return
+    }
+
+    setProfile((current) => ({
+      ...current,
+      avatar: uploadResult.data ?? current.avatar,
+    }))
+    setSaveSuccess('Avatar uploaded. Save the profile to persist the change.')
+  }
 
   const handleSave = async () => {
     setIsSaving(true)
@@ -78,6 +110,7 @@ export function DeveloperProfile() {
       phone: profile.phone,
       address: profile.address,
       bio: profile.bio,
+      avatarUrl: profile.avatar,
       companyName: profile.companyName,
       licenseNumber: profile.licenseNumber,
     })
@@ -127,17 +160,35 @@ export function DeveloperProfile() {
           <div className="flex flex-col items-center">
             <div className="relative">
               <Avatar className="h-24 w-24 border-2 border-accent/30">
-                <AvatarImage src="/placeholder.svg" alt="Developer" />
+                <AvatarImage src={profile.avatar} alt={profile.companyName} />
                 <AvatarFallback className="bg-accent/20 text-accent text-2xl font-medium">
-                  AD
+                  {profile.companyName
+                    .split(' ')
+                    .map((part) => part[0])
+                    .join('')
+                    .slice(0, 2)}
                 </AvatarFallback>
               </Avatar>
-              <button className="absolute bottom-0 right-0 h-8 w-8 bg-accent text-accent-foreground rounded-full flex items-center justify-center hover:bg-accent/90 transition-colors">
+              <label
+                htmlFor="developer-avatar-upload"
+                className="absolute bottom-0 right-0 h-8 w-8 bg-accent text-accent-foreground rounded-full flex items-center justify-center hover:bg-accent/90 transition-colors cursor-pointer"
+              >
                 <Camera className="h-4 w-4" />
-              </button>
+                <input
+                  id="developer-avatar-upload"
+                  type="file"
+                  accept="image/*"
+                  className="sr-only"
+                  onChange={(event) => {
+                    void handleAvatarUpload(event)
+                  }}
+                />
+              </label>
             </div>
             <h3 className="mt-3 text-lg font-medium text-foreground">{profile.companyName}</h3>
-            <p className="text-sm text-muted-foreground">Developer Account</p>
+            <p className="text-sm text-muted-foreground">
+              {isUploadingAvatar ? 'Uploading avatar...' : 'Developer Account'}
+            </p>
           </div>
 
           {/* Profile Form */}
@@ -265,7 +316,7 @@ export function DeveloperProfile() {
               </Button>
               <Button
                 onClick={handleSave}
-                disabled={isSaving}
+                disabled={isSaving || isUploadingAvatar}
                 className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90"
               >
                 {isSaving ? (
@@ -276,7 +327,7 @@ export function DeveloperProfile() {
                 ) : (
                   <span className="flex items-center gap-2">
                     <Save className="h-4 w-4" />
-                    Save
+                    {isUploadingAvatar ? 'Uploading...' : 'Save'}
                   </span>
                 )}
               </Button>
