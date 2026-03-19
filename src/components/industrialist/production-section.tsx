@@ -26,114 +26,46 @@ import {
   Line,
   Legend,
   ComposedChart,
-  Area,
 } from "recharts"
+import { StatusMessage } from "@/components/ui/status-message"
+import type { IndustrialistProductionData } from "@/types/dashboard"
 
-const productionData = [
-  { month: "Jan", actual: 12500, target: 12000, efficiency: 92 },
-  { month: "Feb", actual: 13200, target: 12500, efficiency: 94 },
-  { month: "Mar", actual: 14100, target: 13000, efficiency: 95 },
-  { month: "Apr", actual: 13800, target: 13500, efficiency: 93 },
-  { month: "May", actual: 15200, target: 14000, efficiency: 96 },
-  { month: "Jun", actual: 14900, target: 14500, efficiency: 94 },
-  { month: "Jul", actual: 15800, target: 15000, efficiency: 97 },
-  { month: "Aug", actual: 16200, target: 15500, efficiency: 96 },
-  { month: "Sep", actual: 15500, target: 15000, efficiency: 95 },
-  { month: "Oct", actual: 16800, target: 16000, efficiency: 97 },
-  { month: "Nov", actual: 17200, target: 16500, efficiency: 98 },
-  { month: "Dec", actual: 17800, target: 17000, efficiency: 97 },
-]
+type ProductionSectionProps = {
+  data: IndustrialistProductionData
+  onSendReport: () => Promise<void>
+}
 
-const productLines = [
-  { 
-    name: "Product Line A", 
-    units: 45200, 
-    target: 48000, 
-    efficiency: 94.2,
-    status: "on-track"
-  },
-  { 
-    name: "Product Line B", 
-    units: 32100, 
-    target: 30000, 
-    efficiency: 107,
-    status: "exceeding"
-  },
-  { 
-    name: "Product Line C", 
-    units: 18500, 
-    target: 22000, 
-    efficiency: 84.1,
-    status: "behind"
-  },
-  { 
-    name: "Product Line D", 
-    units: 27800, 
-    target: 28000, 
-    efficiency: 99.3,
-    status: "on-track"
-  },
-]
-
-const weeklyData = [
-  { day: "Mon", shift1: 420, shift2: 380, shift3: 350 },
-  { day: "Tue", shift1: 450, shift2: 410, shift3: 370 },
-  { day: "Wed", shift1: 480, shift2: 420, shift3: 390 },
-  { day: "Thu", shift1: 460, shift2: 400, shift3: 360 },
-  { day: "Fri", shift1: 490, shift2: 440, shift3: 400 },
-  { day: "Sat", shift1: 350, shift2: 320, shift3: 0 },
-  { day: "Sun", shift1: 0, shift2: 0, shift3: 0 },
-]
-
-export function ProductionSection() {
+export function ProductionSection({ data, onSendReport }: ProductionSectionProps) {
   const [reportDialogOpen, setReportDialogOpen] = useState(false)
-  const [reportSent, setReportSent] = useState(false)
+  const [reporting, setReporting] = useState(false)
+  const [reportError, setReportError] = useState<string | null>(null)
 
-  const stats = [
-    {
-      label: "Total Units (YTD)",
-      value: "183,200",
-      change: 12.5,
-      icon: Package,
-      subtext: "Target: 175,000",
-    },
-    {
-      label: "Avg. Efficiency",
-      value: "95.3%",
-      change: 3.2,
-      icon: Target,
-      subtext: "Industry avg: 89%",
-    },
-    {
-      label: "Uptime",
-      value: "98.7%",
-      change: 1.1,
-      icon: Clock,
-      subtext: "12 hrs downtime/month",
-    },
-    {
-      label: "Energy per Unit",
-      value: "2.4 kWh",
-      change: -8.5,
-      icon: Zap,
-      subtext: "Down from 2.6 kWh",
-    },
-  ]
-
-  const handleSendReport = () => {
-    setReportSent(true)
-    setTimeout(() => {
+  const handleSendReport = async () => {
+    setReporting(true)
+    setReportError(null)
+    try {
+      await onSendReport()
       setReportDialogOpen(false)
-      setReportSent(false)
-    }, 2000)
+    } catch (reportError) {
+      setReportError(reportError instanceof Error ? reportError.message : "Unable to send production report.")
+    } finally {
+      setReporting(false)
+    }
   }
 
   return (
     <div className="space-y-6">
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {stats.map((stat) => {
-          const Icon = stat.icon
+        {data.stats.map((stat) => {
+          const Icon =
+            stat.label.includes("Units")
+              ? Package
+              : stat.label.includes("Efficiency")
+                ? Target
+                : stat.label.includes("Uptime")
+                  ? Clock
+                  : Zap
           const isPositive = stat.label === "Energy per Unit" ? stat.change < 0 : stat.change > 0
           return (
             <Card key={stat.label} className="bg-card border-border">
@@ -188,19 +120,19 @@ export function ProductionSection() {
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
                       <p className="text-muted-foreground">Total Units</p>
-                      <p className="font-semibold">183,200 units</p>
+                      <p className="font-semibold">{data.stats[0]?.value ?? "0"} units</p>
                     </div>
                     <div>
                       <p className="text-muted-foreground">Target Achievement</p>
-                      <p className="font-semibold text-emerald-400">104.7%</p>
+                      <p className="font-semibold text-emerald-400">{data.stats[1]?.value ?? "0%"}</p>
                     </div>
                     <div>
                       <p className="text-muted-foreground">Efficiency Rate</p>
-                      <p className="font-semibold">95.3%</p>
+                      <p className="font-semibold">{data.stats[1]?.value ?? "0%"}</p>
                     </div>
                     <div>
                       <p className="text-muted-foreground">Energy Consumption</p>
-                      <p className="font-semibold">439,680 kWh</p>
+                      <p className="font-semibold">{data.stats[3]?.value ?? "0 kWh"}</p>
                     </div>
                   </div>
                 </div>
@@ -213,20 +145,15 @@ export function ProductionSection() {
                     <li>- Resource utilization</li>
                   </ul>
                 </div>
-                {reportSent ? (
-                  <div className="flex items-center justify-center gap-2 p-4 bg-emerald-500/20 rounded-lg text-emerald-400">
-                    <TrendingUp className="w-5 h-5" />
-                    Report sent successfully!
-                  </div>
-                ) : (
-                  <Button 
-                    onClick={handleSendReport}
-                    className="w-full bg-accent text-accent-foreground hover:bg-accent/90"
-                  >
-                    <Send className="w-4 h-4 mr-2" />
-                    Confirm & Send Report
-                  </Button>
-                )}
+                {reportError ? <StatusMessage tone="error">{reportError}</StatusMessage> : null}
+                <Button 
+                  onClick={() => void handleSendReport()}
+                  className="w-full bg-accent text-accent-foreground hover:bg-accent/90"
+                  disabled={reporting}
+                >
+                  <Send className="w-4 h-4 mr-2" />
+                  {reporting ? "Sending..." : "Confirm & Send Report"}
+                </Button>
               </div>
             </DialogContent>
           </Dialog>
@@ -234,7 +161,7 @@ export function ProductionSection() {
         <CardContent>
           <div className="h-[350px]">
             <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={productionData}>
+              <ComposedChart data={data.monthly}>
                 <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.3 0.005 260)" />
                 <XAxis dataKey="month" stroke="oklch(0.5 0 0)" fontSize={12} />
                 <YAxis yAxisId="left" stroke="oklch(0.5 0 0)" fontSize={12} />
@@ -285,7 +212,7 @@ export function ProductionSection() {
             <CardTitle className="text-lg font-semibold">Product Lines Performance</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {productLines.map((line) => (
+            {data.productLines.map((line) => (
               <div key={line.name} className="space-y-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -322,7 +249,7 @@ export function ProductionSection() {
           <CardContent>
             <div className="h-[250px]">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={weeklyData}>
+                <BarChart data={data.weekly}>
                   <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.3 0.005 260)" />
                   <XAxis dataKey="day" stroke="oklch(0.5 0 0)" fontSize={12} />
                   <YAxis stroke="oklch(0.5 0 0)" fontSize={12} />
@@ -354,22 +281,22 @@ export function ProductionSection() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="p-4 bg-secondary rounded-lg text-center">
               <Users className="w-6 h-6 mx-auto mb-2 text-accent" />
-              <p className="text-2xl font-bold">342</p>
+              <p className="text-2xl font-bold">{data.workforce.totalWorkers}</p>
               <p className="text-sm text-muted-foreground">Total Workers</p>
             </div>
             <div className="p-4 bg-secondary rounded-lg text-center">
               <Factory className="w-6 h-6 mx-auto mb-2 text-accent" />
-              <p className="text-2xl font-bold">4</p>
+              <p className="text-2xl font-bold">{data.workforce.productionLines}</p>
               <p className="text-sm text-muted-foreground">Production Lines</p>
             </div>
             <div className="p-4 bg-secondary rounded-lg text-center">
               <Clock className="w-6 h-6 mx-auto mb-2 text-accent" />
-              <p className="text-2xl font-bold">3</p>
+              <p className="text-2xl font-bold">{data.workforce.activeShifts}</p>
               <p className="text-sm text-muted-foreground">Active Shifts</p>
             </div>
             <div className="p-4 bg-secondary rounded-lg text-center">
               <Target className="w-6 h-6 mx-auto mb-2 text-accent" />
-              <p className="text-2xl font-bold">87%</p>
+              <p className="text-2xl font-bold">{data.workforce.capacityUsed}%</p>
               <p className="text-sm text-muted-foreground">Capacity Used</p>
             </div>
           </div>

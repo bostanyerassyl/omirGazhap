@@ -441,6 +441,30 @@ export function updateIconMarker(map, featureId, lngLat, icon, iconUrl) {
   iconMarkers.set(featureId, marker);
 }
 
+function syncPointIconMarkers(draw, map) {
+  if (!draw || !map) return;
+  const all = draw.getAll?.();
+  const features = Array.isArray(all?.features) ? all.features : [];
+  const activeIds = new Set();
+
+  for (const feat of features) {
+    if (feat?.geometry?.type !== 'Point') continue;
+    const icon = feat?.properties?.icon;
+    if (!icon || icon === 'none') continue;
+    const featureId = feat.id;
+    const coords = feat.geometry?.coordinates;
+    if (!featureId || !Array.isArray(coords)) continue;
+    activeIds.add(featureId);
+    updateIconMarker(map, featureId, coords, icon, feat?.properties?.icon_url ?? null);
+  }
+
+  for (const [featureId, marker] of iconMarkers.entries()) {
+    if (activeIds.has(featureId)) continue;
+    marker.remove();
+    iconMarkers.delete(featureId);
+  }
+}
+
 // ── SIDEBAR ───────────────────────────────────────────────────────────────────
 export async function openFeatureSidebar(feature, draw, map) {
   resetSidebar();
@@ -559,9 +583,16 @@ function setupTrafficLightUI({ dbId, draw, map, feature }) {
     section.style.display = 'none';
     return;
   }
-  section.style.display = '';
-
   const currentState = getTrafficLightState(dbId);
+  const icon = feature?.properties?.icon ?? null;
+  const isTrafficLightFeature = icon === '🚦';
+  if (!isTrafficLightFeature) {
+    section.style.display = 'none';
+    hint.textContent = 'Set icon to 🚦 to enable traffic light controls.';
+    return;
+  }
+
+  section.style.display = '';
   for (const btn of buttons) {
     btn.classList.toggle('active', btn.dataset.state === currentState);
     btn.onclick = async () => {
@@ -1135,16 +1166,19 @@ export async function setupDraw(map) {
     });
   });
 
-  document.getElementById('draw-delete').addEventListener('click', async () => {
-    const selected = draw.getSelected();
-    for (const feature of selected.features) {
-      const id = feature.properties.id ?? feature.id;
-      await deleteFeature(id);
-      draw.delete(feature.id);
-      iconMarkers.get(feature.id)?.remove();
-      iconMarkers.delete(feature.id);
-    }
-  });
+  const deleteButton = document.getElementById('draw-delete');
+  if (deleteButton) {
+    deleteButton.addEventListener('click', async () => {
+      const selected = draw.getSelected();
+      for (const feature of selected.features) {
+        const id = feature.properties.id ?? feature.id;
+        await deleteFeature(id);
+        draw.delete(feature.id);
+        iconMarkers.get(feature.id)?.remove();
+        iconMarkers.delete(feature.id);
+      }
+    });
+  }
 
   map.on('draw.create', async e => {
     const feature = e.features[0];
@@ -1159,6 +1193,7 @@ export async function setupDraw(map) {
       safeSetFeatureProperty(draw, feature.id, 'asset_id', feature.properties.asset_id);
     }
     await saveFeature(feature);
+    syncPointIconMarkers(draw, map);
     openFeatureSidebar(feature, draw, map);
   });
 
@@ -1179,7 +1214,18 @@ export async function setupDraw(map) {
           feature.properties.icon, feature.properties.icon_url);
       }
     }
+    syncPointIconMarkers(draw, map);
   });
+
+  map.on('draw.delete', () => {
+    syncPointIconMarkers(draw, map);
+  });
+
+  map.on('idle', () => {
+    syncPointIconMarkers(draw, map);
+  });
+
+  syncPointIconMarkers(draw, map);
   return draw;
   
 }
@@ -1203,6 +1249,8 @@ function setupIconPicker(map, draw) {
         updateIconMarker(map, activeFeature.id,
           activeFeature.geometry.coordinates, icon, null);
       }
+      const dbId = resolveFeatureDbId(activeFeature);
+      if (dbId) setupTrafficLightUI({ dbId, draw, map, feature: activeFeature });
     });
   });
 
@@ -1226,5 +1274,7 @@ function setupIconPicker(map, draw) {
       updateIconMarker(map, activeFeature.id,
         activeFeature.geometry.coordinates, 'custom', data.publicUrl);
     }
+    const dbId = resolveFeatureDbId(activeFeature);
+    if (dbId) setupTrafficLightUI({ dbId, draw, map, feature: activeFeature });
   });
 }

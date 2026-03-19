@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { Camera, Mail, Phone, MapPin, Save, User, LogOut } from "lucide-react"
+import { Camera, Mail, MapPin, Phone, Save, User } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -12,13 +12,16 @@ import {
   SheetDescription,
   SheetHeader,
   SheetTitle,
-  SheetTrigger,
 } from "@/components/ui/sheet"
 import { useAuth } from "@/features/auth/model/AuthProvider"
 import { storageService } from "@/services/domain/storageService"
-import { useNavigate } from "react-router-dom"
 
-interface UserProfile {
+type UtilitiesProfileSheetProps = {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+}
+
+type UtilitiesProfileForm = {
   name: string
   email: string
   phone: string
@@ -27,28 +30,40 @@ interface UserProfile {
   avatar: string
 }
 
-export function ProfileSheet() {
-  const { user, profile: authProfile, updateEmail, updateProfile, logout } = useAuth()
-  const navigate = useNavigate()
-  const [profile, setProfile] = useState<UserProfile>({
-    name: "Citizen User",
-    email: "user@alatau.city",
-    phone: "+7 (700) 123-4567",
-    address: "Alatau District, Block 5",
-    bio: "Resident of Alatau Smart City",
-    avatar: ""
-  })
+function getInitials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+  if (!parts.length) {
+    return "UP"
+  }
+  if (parts.length === 1) {
+    return parts[0].slice(0, 2).toUpperCase()
+  }
+  return `${parts[0][0] ?? ""}${parts[1][0] ?? ""}`.toUpperCase()
+}
+
+export function UtilitiesProfileSheet({
+  open,
+  onOpenChange,
+}: UtilitiesProfileSheetProps) {
+  const { user, profile: authProfile, updateEmail, updateProfile } = useAuth()
   const [isEditing, setIsEditing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null)
-  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false)
+  const [profile, setProfile] = useState<UtilitiesProfileForm>({
+    name: "Public Utilities",
+    email: "admin@utilities.alatau.kz",
+    phone: "",
+    address: "",
+    bio: "",
+    avatar: "",
+  })
 
   useEffect(() => {
     if (!authProfile) {
       return
     }
-
     setProfile({
       name: authProfile.fullName,
       email: authProfile.email,
@@ -59,9 +74,8 @@ export function ProfileSheet() {
     })
   }, [authProfile])
 
-  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-
+  const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
     if (!file || !user) {
       return
     }
@@ -73,29 +87,28 @@ export function ProfileSheet() {
     const uploadResult = await storageService.uploadAvatar(user.id, file)
 
     setIsUploadingAvatar(false)
-    e.target.value = ''
+    event.target.value = ""
 
     if (uploadResult.error) {
       setSaveError(uploadResult.error.message)
       return
     }
 
-    setProfile((prev) => ({
-      ...prev,
-      avatar: uploadResult.data ?? prev.avatar,
+    setProfile((current) => ({
+      ...current,
+      avatar: uploadResult.data ?? current.avatar,
     }))
-    setSaveSuccess('Avatar uploaded. Save the profile to persist the change.')
+    setSaveSuccess("Avatar uploaded. Save the profile to persist the change.")
   }
 
   const handleSave = async () => {
     setIsSaving(true)
     setSaveError(null)
     setSaveSuccess(null)
-    const emailChanged = profile.email !== (authProfile?.email ?? '')
 
+    const emailChanged = profile.email !== (authProfile?.email ?? "")
     if (emailChanged) {
       const emailResult = await updateEmail(profile.email)
-
       if (emailResult.error) {
         setIsSaving(false)
         setSaveError(emailResult.error.message)
@@ -110,8 +123,8 @@ export function ProfileSheet() {
       bio: profile.bio,
       avatarUrl: profile.avatar,
     })
-    setIsSaving(false)
 
+    setIsSaving(false)
     if (result.error) {
       setSaveError(result.error.message)
       return
@@ -119,65 +132,51 @@ export function ProfileSheet() {
 
     setSaveSuccess(
       emailChanged
-        ? 'Profile saved. Check your inbox if email confirmation is required.'
-        : 'Profile saved successfully.',
+        ? "Profile saved. Check your inbox if email confirmation is required."
+        : "Profile saved successfully.",
     )
     setIsEditing(false)
   }
 
-  const handleLogout = async () => {
-    await logout()
-    navigate("/login", { replace: true })
-  }
-
   return (
-    <Sheet>
-      <SheetTrigger asChild>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="flex items-center gap-2 px-2 hover:bg-secondary"
-        >
-          <Avatar className="size-8 border-2 border-accent">
-            <AvatarImage src={profile.avatar} alt={profile.name} />
-            <AvatarFallback className="bg-secondary text-foreground text-xs">
-              {profile.name.split(' ').map(n => n[0]).join('')}
-            </AvatarFallback>
-          </Avatar>
-          <span className="hidden md:inline text-sm font-medium">{profile.name}</span>
-        </Button>
-      </SheetTrigger>
-      <SheetContent side="left" className="w-full sm:max-w-md bg-card border-border overflow-y-auto">
+    <Sheet
+      open={open}
+      onOpenChange={(nextOpen) => {
+        onOpenChange(nextOpen)
+        if (!nextOpen) {
+          setIsEditing(false)
+          setSaveError(null)
+          setSaveSuccess(null)
+        }
+      }}
+    >
+      <SheetContent side="left" className="w-full sm:max-w-md overflow-y-auto">
         <SheetHeader className="text-left">
-          <SheetTitle className="text-foreground">My Profile</SheetTitle>
-          <SheetDescription className="text-muted-foreground">
-            Manage your personal information
+          <SheetTitle>Utilities Profile</SheetTitle>
+          <SheetDescription>
+            Manage your utilities account profile information.
           </SheetDescription>
         </SheetHeader>
-        
-        <div className="mt-6 space-y-6">
-          {saveError ? (
-            <StatusMessage tone="error">{saveError}</StatusMessage>
-          ) : null}
-          {saveSuccess ? (
-            <StatusMessage tone="success">{saveSuccess}</StatusMessage>
-          ) : null}
-          {/* Avatar section */}
+
+        <div className="mt-4 space-y-6 px-4 pb-6">
+          {saveError ? <StatusMessage tone="error">{saveError}</StatusMessage> : null}
+          {saveSuccess ? <StatusMessage tone="success">{saveSuccess}</StatusMessage> : null}
+
           <div className="flex flex-col items-center gap-4">
             <div className="relative">
               <Avatar className="size-24 border-4 border-accent">
                 <AvatarImage src={profile.avatar} alt={profile.name} />
                 <AvatarFallback className="bg-secondary text-foreground text-2xl">
-                  {profile.name.split(' ').map(n => n[0]).join('')}
+                  {getInitials(profile.name)}
                 </AvatarFallback>
               </Avatar>
-              <label 
-                htmlFor="avatar-upload"
+              <label
+                htmlFor="utilities-avatar-upload"
                 className="absolute bottom-0 right-0 flex items-center justify-center size-8 rounded-full bg-accent text-accent-foreground cursor-pointer hover:bg-accent/90 transition-colors"
               >
                 <Camera className="size-4" />
                 <input
-                  id="avatar-upload"
+                  id="utilities-avatar-upload"
                   type="file"
                   accept="image/*"
                   className="sr-only"
@@ -188,89 +187,82 @@ export function ProfileSheet() {
               </label>
             </div>
             <p className="text-xs text-muted-foreground">
-              {isUploadingAvatar ? 'Uploading avatar...' : 'Click camera to upload photo'}
+              {isUploadingAvatar ? "Uploading avatar..." : "Click camera to upload photo"}
             </p>
           </div>
 
-          {/* Profile form */}
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="name" className="text-foreground flex items-center gap-2">
+              <Label htmlFor="utilities-name" className="flex items-center gap-2">
                 <User className="size-4 text-accent" />
                 Full Name
               </Label>
               <Input
-                id="name"
+                id="utilities-name"
                 value={profile.name}
-                onChange={(e) => setProfile(prev => ({ ...prev, name: e.target.value }))}
+                onChange={(event) => setProfile((current) => ({ ...current, name: event.target.value }))}
                 disabled={!isEditing}
-                className="bg-secondary border-border text-foreground"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="email" className="text-foreground flex items-center gap-2">
+              <Label htmlFor="utilities-email" className="flex items-center gap-2">
                 <Mail className="size-4 text-accent" />
                 Email
               </Label>
               <Input
-                id="email"
+                id="utilities-email"
                 type="email"
                 value={profile.email}
-                onChange={(e) => setProfile(prev => ({ ...prev, email: e.target.value }))}
+                onChange={(event) => setProfile((current) => ({ ...current, email: event.target.value }))}
                 disabled={!isEditing}
-                className="bg-secondary border-border text-foreground"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="phone" className="text-foreground flex items-center gap-2">
+              <Label htmlFor="utilities-phone" className="flex items-center gap-2">
                 <Phone className="size-4 text-accent" />
                 Phone
               </Label>
               <Input
-                id="phone"
-                type="tel"
+                id="utilities-phone"
                 value={profile.phone}
-                onChange={(e) => setProfile(prev => ({ ...prev, phone: e.target.value }))}
+                onChange={(event) => setProfile((current) => ({ ...current, phone: event.target.value }))}
                 disabled={!isEditing}
-                className="bg-secondary border-border text-foreground"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="address" className="text-foreground flex items-center gap-2">
+              <Label htmlFor="utilities-address" className="flex items-center gap-2">
                 <MapPin className="size-4 text-accent" />
                 Address
               </Label>
               <Input
-                id="address"
+                id="utilities-address"
                 value={profile.address}
-                onChange={(e) => setProfile(prev => ({ ...prev, address: e.target.value }))}
+                onChange={(event) => setProfile((current) => ({ ...current, address: event.target.value }))}
                 disabled={!isEditing}
-                className="bg-secondary border-border text-foreground"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="bio" className="text-foreground">About Me</Label>
+              <Label htmlFor="utilities-bio">About</Label>
               <Textarea
-                id="bio"
+                id="utilities-bio"
                 value={profile.bio}
-                onChange={(e) => setProfile(prev => ({ ...prev, bio: e.target.value }))}
+                onChange={(event) => setProfile((current) => ({ ...current, bio: event.target.value }))}
                 disabled={!isEditing}
-                className="bg-secondary border-border text-foreground min-h-[100px] resize-none"
+                className="min-h-[110px] resize-none"
               />
             </div>
           </div>
 
-          {/* Action buttons */}
           <div className="flex gap-3">
             {isEditing ? (
               <>
-                <Button 
-                  variant="outline" 
-                  className="flex-1 border-border text-foreground hover:bg-secondary"
+                <Button
+                  variant="outline"
+                  className="flex-1"
                   onClick={() => {
                     setIsEditing(false)
                     setSaveError(null)
@@ -279,32 +271,15 @@ export function ProfileSheet() {
                 >
                   Cancel
                 </Button>
-                <Button 
-                  className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90"
-                  onClick={handleSave}
-                  disabled={isSaving || isUploadingAvatar}
-                >
+                <Button className="flex-1" onClick={() => void handleSave()} disabled={isSaving || isUploadingAvatar}>
                   <Save className="size-4 mr-2" />
-                  {isSaving ? 'Saving...' : isUploadingAvatar ? 'Uploading...' : 'Save'}
+                  {isSaving ? "Saving..." : isUploadingAvatar ? "Uploading..." : "Save"}
                 </Button>
               </>
             ) : (
-              <>
-                <Button 
-                  className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90"
-                  onClick={() => setIsEditing(true)}
-                >
-                  Edit Profile
-                </Button>
-                <Button
-                  variant="outline"
-                  className="flex-1"
-                  onClick={() => void handleLogout()}
-                >
-                  <LogOut className="size-4 mr-2" />
-                  Logout
-                </Button>
-              </>
+              <Button className="w-full" onClick={() => setIsEditing(true)}>
+                Edit Profile
+              </Button>
             )}
           </div>
         </div>

@@ -70,4 +70,47 @@ export const observationService = {
       }
     }
   },
+
+  async create(input: {
+    assetId?: string | null
+    caseId?: string | null
+    locationId?: string | null
+    createdBy?: string | null
+    payload: Record<string, unknown>
+    reviewStatus?: AdminRequestStatus
+  }): Promise<AuthResult<ObservationItem>> {
+    try {
+      const { data, error } = await supabase
+        .from('observations')
+        .insert({
+          asset_id: input.assetId ?? null,
+          case_id: input.caseId ?? null,
+          location_id: input.locationId ?? null,
+          created_by: input.createdBy ?? null,
+          payload: input.payload,
+          review_status: input.reviewStatus ?? 'pending',
+        })
+        .select('*, locations(name)')
+        .single<ObservationRecord>()
+
+      if (error) {
+        return {
+          data: null,
+          error,
+        }
+      }
+
+      return {
+        data: mapObservation(data),
+        error: null,
+      }
+    } catch (error) {
+      const normalizedError = toError(error)
+      logger.error(normalizedError, 'observation.create')
+      return {
+        data: null,
+        error: normalizedError,
+      }
+    }
+  },
 }

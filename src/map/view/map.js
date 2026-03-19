@@ -1,7 +1,8 @@
 import maplibregl from 'maplibre-gl';
 import { openBuildingSidebar } from './buildings.js';
 import { openFeatureSidebar, setupDraw } from './features.js';
-import { addFriend, loadFriends, teardownFriends } from './friends.js';
+import { addFriend, loadFriends, setFriendsVisibility, teardownFriends } from './friends.js';
+import { addPoi, loadPoi, setPoiVisibility, teardownPoi } from './poi.js';
 import { closeSidebar } from './sidebar.js';
 import { registerMapActionHandlers } from '../../features/map/model/map-actions';
 import { teardownTrafficLights } from './traffic-lights.js';
@@ -47,6 +48,7 @@ export async function initializeMapView() {
   let navStartMarker = null;
   let navEndMarker = null;
   let unregisterActions = null;
+  let pendingPointPick = null;
 
   const clearRoute = () => {
     if (map.getLayer('nav-route-line')) map.removeLayer('nav-route-line');
@@ -150,6 +152,36 @@ export async function initializeMapView() {
         longitude: Number.isFinite(longitude) ? longitude : center.lng,
       });
     },
+    addPoi: async ({ category, name, description, latitude, longitude }) => {
+      const center = map.getCenter();
+      return addPoi({
+        category,
+        name,
+        description,
+        latitude: Number.isFinite(latitude) ? latitude : center.lat,
+        longitude: Number.isFinite(longitude) ? longitude : center.lng,
+      });
+    },
+    setFilters: ({ ramps, scooters, friends, events, buses }) => {
+      setFriendsVisibility(friends);
+      setPoiVisibility({ ramps, scooters, events, buses });
+    },
+    pickPoint: async () => {
+      if (pendingPointPick) {
+        return { ok: false, error: 'Point pick is already in progress' };
+      }
+      map.getCanvas().style.cursor = 'crosshair';
+      return new Promise((resolve) => {
+        pendingPointPick = (lngLat) => {
+          map.getCanvas().style.cursor = '';
+          resolve({
+            ok: true,
+            latitude: lngLat.lat,
+            longitude: lngLat.lng,
+          });
+        };
+      });
+    },
     getMapCenter: () => {
       const center = map.getCenter();
       return { latitude: center.lat, longitude: center.lng };
@@ -211,7 +243,21 @@ export async function initializeMapView() {
       });
     });
 
+    let ignoreMapClickUntil = 0;
+    map.on('draw.create', () => {
+      ignoreMapClickUntil = Date.now() + 400;
+    });
+
     map.on('click', e => {
+      if (pendingPointPick) {
+        const resolvePick = pendingPointPick;
+        pendingPointPick = null;
+        resolvePick(e.lngLat);
+        return;
+      }
+      if (Date.now() < ignoreMapClickUntil) return;
+      if (draw.getMode?.() && draw.getMode() !== 'simple_select') return;
+
       const drawFeatureIds = draw.getFeatureIdsAt(e.point);
       const buildingFeatures = map.queryRenderedFeatures(e.point, { layers: ['building-hit'] });
       const selectedDrawFeatures = draw.getSelected().features;
@@ -249,11 +295,13 @@ export async function initializeMapView() {
     });
 
     await loadFriends(map);
+    await loadPoi(map);
   });
 
   return () => {
     clearRoute();
     teardownFriends();
+    teardownPoi();
     teardownTrafficLights();
     unregisterActions?.();
     map.remove();

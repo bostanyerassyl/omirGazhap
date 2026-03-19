@@ -1,8 +1,9 @@
 import { useState } from "react"
-import { Plus, Users, MapPin, Camera, X } from "lucide-react"
+import { Plus, Users, MapPin } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { StatusMessage } from "@/components/ui/status-message"
 import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
@@ -13,43 +14,54 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { addFriendToMap, getMapCenterPosition } from "@/features/map/model/map-actions"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
+  addFriendToMap,
+  addPoiToMap,
+  getMapCenterPosition,
+  pickPointOnMap,
+  type PoiCategory,
+} from "@/features/map/model/map-actions"
 
-export function AddContentDialog() {
+type AddContentDialogProps = {
+  locationOptions: Array<{ id: string; name: string }>
+  onAddPlace: (payload: {
+    name: string
+    description: string
+    locationId?: string | null
+    photosCount?: number
+  }) => Promise<void>
+}
+
+export function AddContentDialog({
+  locationOptions,
+  onAddPlace,
+}: AddContentDialogProps) {
   const [open, setOpen] = useState(false)
   const [friendName, setFriendName] = useState("")
   const [friendAvatar, setFriendAvatar] = useState("")
   const [friendLatitude, setFriendLatitude] = useState("")
   const [friendLongitude, setFriendLongitude] = useState("")
   const [friendStatus, setFriendStatus] = useState<string | null>(null)
+  const [submittingPlace, setSubmittingPlace] = useState(false)
+  const [placeError, setPlaceError] = useState<string | null>(null)
+  const [placeSuccess, setPlaceSuccess] = useState<string | null>(null)
   const [placeData, setPlaceData] = useState({
+    category: "events" as PoiCategory,
     name: "",
+    latitude: "",
+    longitude: "",
     description: "",
-    photos: [] as string[]
+    locationId: "",
+    photos: [] as string[],
+    status: null as string | null,
   })
-
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files
-    if (files) {
-      Array.from(files).forEach(file => {
-        const reader = new FileReader()
-        reader.onloadend = () => {
-          setPlaceData(prev => ({ 
-            ...prev, 
-            photos: [...prev.photos, reader.result as string].slice(0, 4)
-          }))
-        }
-        reader.readAsDataURL(file)
-      })
-    }
-  }
-
-  const removePhoto = (index: number) => {
-    setPlaceData(prev => ({
-      ...prev,
-      photos: prev.photos.filter((_, i) => i !== index)
-    }))
-  }
 
   const handleAddFriend = () => {
     const trimmedName = friendName.trim()
@@ -76,10 +88,120 @@ export function AddContentDialog() {
     })
   }
 
-  const handleAddPlace = () => {
-    if (placeData.name) {
-      setPlaceData({ name: "", description: "", photos: [] })
-      setOpen(false)
+  const handleAddPlace = async () => {
+    const trimmedName = placeData.name.trim()
+    if (!trimmedName) return
+
+    setSubmittingPlace(true)
+    setPlaceError(null)
+    setPlaceSuccess(null)
+    setPlaceData((prev) => ({ ...prev, status: "Saving place..." }))
+    const lat = placeData.latitude.trim() ? Number(placeData.latitude) : undefined
+    const lng = placeData.longitude.trim() ? Number(placeData.longitude) : undefined
+
+    try {
+      await onAddPlace({
+        name: trimmedName,
+        description: placeData.description,
+        locationId: placeData.locationId || null,
+        photosCount: placeData.photos.length,
+      })
+
+      const result = await addPoiToMap({
+        category: placeData.category,
+        name: trimmedName,
+        description: placeData.description.trim() || undefined,
+        latitude: Number.isFinite(lat) ? lat : undefined,
+        longitude: Number.isFinite(lng) ? lng : undefined,
+      })
+
+      if (!result.ok) {
+        setPlaceData((prev) => ({
+          ...prev,
+          status: `Saved to database, but map marker failed: ${result.error}`,
+        }))
+        return
+      }
+
+      setPlaceData({
+        category: "events",
+        name: "",
+        latitude: "",
+        longitude: "",
+        description: "",
+        locationId: "",
+        photos: [],
+        status: "Point added to map",
+      })
+      setPlaceSuccess("Place submitted successfully.")
+      setTimeout(() => setOpen(false), 500)
+    } catch (error) {
+      setPlaceError(error instanceof Error ? error.message : "Unable to add place.")
+      setPlaceData((prev) => ({ ...prev, status: "Failed to save place" }))
+    } finally {
+      setSubmittingPlace(false)
+    }
+  }
+
+  const handlePickOnMapAndAdd = async () => {
+    const trimmedName = placeData.name.trim()
+    if (!trimmedName) {
+      setPlaceData((prev) => ({ ...prev, status: "Enter place name first" }))
+      return
+    }
+    setSubmittingPlace(true)
+    setPlaceError(null)
+    setPlaceSuccess(null)
+    setPlaceData((prev) => ({ ...prev, status: "Click anywhere on the map to place this point..." }))
+    setOpen(false)
+    const picked = await pickPointOnMap()
+    if (!picked.ok || !Number.isFinite(picked.latitude) || !Number.isFinite(picked.longitude)) {
+      setOpen(true)
+      setSubmittingPlace(false)
+      setPlaceData((prev) => ({ ...prev, status: `Placement failed: ${picked.error ?? "Unknown error"}` }))
+      return
+    }
+
+    try {
+      await onAddPlace({
+        name: trimmedName,
+        description: placeData.description,
+        locationId: placeData.locationId || null,
+        photosCount: placeData.photos.length,
+      })
+
+      const result = await addPoiToMap({
+        category: placeData.category,
+        name: trimmedName,
+        description: placeData.description.trim() || undefined,
+        latitude: picked.latitude,
+        longitude: picked.longitude,
+      })
+      if (!result.ok) {
+        setOpen(true)
+        setPlaceData((prev) => ({
+          ...prev,
+          status: `Saved to database, but map marker failed: ${result.error}`,
+        }))
+        return
+      }
+      setPlaceData({
+        category: "events",
+        name: "",
+        latitude: "",
+        longitude: "",
+        description: "",
+        locationId: "",
+        photos: [],
+        status: "Point added where you clicked",
+      })
+      setPlaceSuccess("Place submitted successfully.")
+    } catch (error) {
+      setOpen(true)
+      setPlaceError(error instanceof Error ? error.message : "Unable to add place.")
+      setPlaceData((prev) => ({ ...prev, status: "Failed to save place" }))
+    } finally {
+      setSubmittingPlace(false)
     }
   }
 
@@ -198,6 +320,8 @@ export function AddContentDialog() {
           </TabsContent>
 
           <TabsContent value="places" className="mt-4 space-y-4">
+            {placeError ? <StatusMessage tone="error">{placeError}</StatusMessage> : null}
+            {placeSuccess ? <StatusMessage tone="success">{placeSuccess}</StatusMessage> : null}
             <div className="space-y-2">
               <Label htmlFor="place-name" className="text-foreground">
                 Place Name
@@ -225,42 +349,109 @@ export function AddContentDialog() {
             </div>
 
             <div className="space-y-2">
-              <Label className="text-foreground">Photos (up to 4)</Label>
-              <div className="grid grid-cols-4 gap-2">
-                {placeData.photos.map((photo, index) => (
-                  <div key={index} className="relative aspect-square rounded-lg overflow-hidden bg-secondary">
-                    <img src={photo} alt={`Photo ${index + 1}`} className="w-full h-full object-cover" />
-                    <button
-                      onClick={() => removePhoto(index)}
-                      className="absolute top-1 right-1 size-5 rounded-full bg-black/60 flex items-center justify-center hover:bg-black/80"
-                    >
-                      <X className="size-3 text-white" />
-                    </button>
-                  </div>
-                ))}
-                {placeData.photos.length < 4 && (
-                  <label className="aspect-square rounded-lg border-2 border-dashed border-border hover:border-accent transition-colors cursor-pointer flex items-center justify-center">
-                    <Camera className="size-5 text-muted-foreground" />
-                    <input
-                      type="file"
-                      accept="image/*"
-                      multiple
-                      className="sr-only"
-                      onChange={handlePhotoUpload}
-                    />
-                  </label>
-                )}
+              <Label className="text-foreground">Location</Label>
+              <Select
+                value={placeData.locationId}
+                onValueChange={(value) =>
+                  setPlaceData((prev) => ({ ...prev, locationId: value }))
+                }
+              >
+                <SelectTrigger className="bg-secondary border-border text-foreground">
+                  <SelectValue placeholder="Choose location" />
+                </SelectTrigger>
+                <SelectContent>
+                  {locationOptions.map((location) => (
+                    <SelectItem key={location.id} value={location.id}>
+                      {location.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="place-category" className="text-foreground">
+                Category
+              </Label>
+              <select
+                id="place-category"
+                value={placeData.category}
+                onChange={(e) => setPlaceData((prev) => ({ ...prev, category: e.target.value as PoiCategory }))}
+                className="h-10 w-full rounded-md border border-border bg-secondary px-3 text-sm text-foreground"
+              >
+                <option value="ramps">Ramp</option>
+                <option value="scooters">Scooter</option>
+                <option value="events">Event</option>
+                <option value="buses">Bus Stop</option>
+              </select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="place-lat" className="text-foreground">Latitude</Label>
+                <Input
+                  id="place-lat"
+                  placeholder="Auto from map center"
+                  value={placeData.latitude}
+                  onChange={(e) => setPlaceData((prev) => ({ ...prev, latitude: e.target.value }))}
+                  className="bg-secondary border-border text-foreground"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="place-lng" className="text-foreground">Longitude</Label>
+                <Input
+                  id="place-lng"
+                  placeholder="Auto from map center"
+                  value={placeData.longitude}
+                  onChange={(e) => setPlaceData((prev) => ({ ...prev, longitude: e.target.value }))}
+                  className="bg-secondary border-border text-foreground"
+                />
               </div>
             </div>
 
-            <Button 
-              className="w-full bg-accent text-accent-foreground hover:bg-accent/90"
-              onClick={handleAddPlace}
-              disabled={!placeData.name}
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => {
+                const center = getMapCenterPosition()
+                if (!center) {
+                  setPlaceData((prev) => ({ ...prev, status: "Map center unavailable" }))
+                  return
+                }
+                setPlaceData((prev) => ({
+                  ...prev,
+                  latitude: center.latitude.toFixed(6),
+                  longitude: center.longitude.toFixed(6),
+                }))
+              }}
             >
-              <MapPin className="size-4 mr-2" />
-              Add to Map
+              Use Current Map Center
             </Button>
+
+            {placeData.status && (
+              <div className="p-3 bg-secondary/50 rounded-lg">
+                <p className="text-sm text-muted-foreground">{placeData.status}</p>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 gap-2">
+              <Button
+                className="w-full bg-accent text-accent-foreground hover:bg-accent/90"
+                onClick={() => void handlePickOnMapAndAdd()}
+                disabled={!placeData.name.trim() || submittingPlace}
+              >
+                <MapPin className="size-4 mr-2" />
+                {submittingPlace ? "Submitting..." : "Pick on Map and Add"}
+              </Button>
+              <Button 
+                variant="outline"
+                className="w-full"
+                onClick={() => void handleAddPlace()}
+                disabled={!placeData.name.trim() || submittingPlace}
+              >
+                {submittingPlace ? "Submitting..." : "Add Using Coordinates"}
+              </Button>
+            </div>
           </TabsContent>
         </Tabs>
       </DialogContent>

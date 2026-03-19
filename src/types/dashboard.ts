@@ -35,6 +35,49 @@ export type DashboardEvent = {
   location: string
 }
 
+export type DashboardAppeal = {
+  id: string
+  category: string
+  message: string
+  date: string
+  status: 'pending' | 'in-progress' | 'resolved'
+}
+
+export type DashboardNewsItem = {
+  id: string
+  title: string
+  summary: string
+  date: string
+  category: string
+}
+
+export type DashboardSituation = {
+  id: string
+  title: string
+  description: string
+  severity: 'low' | 'medium' | 'high'
+  date: string
+}
+
+export type DashboardLocationOption = {
+  id: string
+  name: string
+}
+
+export type DashboardMapMarker = {
+  id: string
+  type: 'building' | 'event' | 'place'
+  x: number
+  y: number
+  label: string
+  details?: {
+    title?: string
+    description?: string
+    status?: string
+    eventDate?: string
+  }
+}
+
 export type AkimatQuickStat = {
   label: string
   value: string
@@ -248,16 +291,185 @@ export type IndustrialistCompanyInfo = {
   notifications: number
 }
 
+export type IndustrialistMetricCard = {
+  label: string
+  value: string
+  change: number
+  subtext: string
+}
+
+export type IndustrialistMonthlyEmissionPoint = {
+  month: string
+  co2: number
+  nox: number
+  so2: number
+  particles: number
+}
+
+export type IndustrialistBreakdownItem = {
+  name: string
+  value: number
+  color: string
+}
+
+export type IndustrialistIncident = {
+  id: string
+  type: 'leak' | 'excess' | 'violation' | 'accident'
+  title: string
+  date: string
+  severity: 'low' | 'medium' | 'high' | 'critical'
+  consequence: string
+  solution: string
+  status: 'pending' | 'in-progress' | 'resolved'
+  reportedToAkimat: boolean
+  assetId: string | null
+}
+
+export type IndustrialistProductionPoint = {
+  month: string
+  actual: number
+  target: number
+  efficiency: number
+}
+
+export type IndustrialistProductLine = {
+  id: string
+  name: string
+  units: number
+  target: number
+  efficiency: number
+  status: 'on-track' | 'exceeding' | 'behind'
+}
+
+export type IndustrialistWeeklyShiftPoint = {
+  day: string
+  shift1: number
+  shift2: number
+  shift3: number
+}
+
+export type IndustrialistQuarterlyComparison = {
+  quarter: string
+  current: number
+  previous: number
+  growth: number
+}
+
+export type IndustrialistTransaction = {
+  id: string
+  type: 'income' | 'expense'
+  description: string
+  amount: number
+  date: string
+}
+
+export type IndustrialistNotification = {
+  id: string
+  title: string
+  description: string
+  date: string
+}
+
+export type IndustrialistEmissionsData = {
+  stats: IndustrialistMetricCard[]
+  monthly: IndustrialistMonthlyEmissionPoint[]
+  breakdown: IndustrialistBreakdownItem[]
+  incidents: IndustrialistIncident[]
+}
+
+export type IndustrialistProductionData = {
+  stats: IndustrialistMetricCard[]
+  monthly: IndustrialistProductionPoint[]
+  productLines: IndustrialistProductLine[]
+  weekly: IndustrialistWeeklyShiftPoint[]
+  workforce: {
+    totalWorkers: number
+    productionLines: number
+    activeShifts: number
+    capacityUsed: number
+  }
+}
+
+export type IndustrialistFinancesData = {
+  stats: IndustrialistMetricCard[]
+  monthly: Array<{
+    month: string
+    revenue: number
+    expenses: number
+    profit: number
+  }>
+  expenseBreakdown: Array<IndustrialistBreakdownItem & { amount: number }>
+  quarterly: IndustrialistQuarterlyComparison[]
+  transactions: IndustrialistTransaction[]
+  summary: {
+    totalRevenue: number
+    totalExpenses: number
+    totalProfit: number
+    taxesPaid: number
+  }
+}
+
 export type UtilitiesChartType = 'area' | 'bar' | 'line'
+export type UtilitiesResourceKey = 'electricity' | 'water' | 'gas' | 'transport'
 
 export type UtilitiesChartTypeOption = {
   id: UtilitiesChartType
   label: string
 }
 
+export type UtilitiesChartPoint = {
+  month: string
+  current: number
+  previous: number
+  predicted: number
+}
+
+export type UtilitiesOperationalEvent = {
+  id: string
+  title: string
+  description: string
+  type: 'warning' | 'prediction' | 'opportunity' | 'alert'
+  resource: UtilitiesResourceKey
+  impact: 'high' | 'medium' | 'low'
+  predictedChange: number
+  date: string
+  location: string
+  status: 'pending' | 'in-progress' | 'resolved'
+}
+
+export type UtilitiesResourceMetrics = {
+  unit: string
+  currentValue: number
+  previousValue: number
+  efficiency: number
+  cost: number
+  monthly: UtilitiesChartPoint[]
+  peakHours: string
+  activeConnections: number
+  avgDailyUsage: string
+}
+
+export type UtilitiesDistrictMetric = {
+  id: string
+  name: string
+  consumption: number
+}
+
+export type UtilitiesReportTarget = {
+  assetId: string
+  name: string
+  resource: UtilitiesResourceKey
+  location: string
+}
+
 export type DashboardData = {
   dashboard: {
     events: DashboardEvent[]
+    appeals: DashboardAppeal[]
+    news: DashboardNewsItem[]
+    situations: DashboardSituation[]
+    locationOptions: DashboardLocationOption[]
+    mapMarkers: DashboardMapMarker[]
   }
   developer: {
     objects: ConstructionObject[]
@@ -278,9 +490,17 @@ export type DashboardData = {
   }
   industrialist: {
     companyInfo: IndustrialistCompanyInfo
+    notifications: IndustrialistNotification[]
+    emissions: IndustrialistEmissionsData
+    production: IndustrialistProductionData
+    finances: IndustrialistFinancesData
   }
   utilities: {
     chartTypes: UtilitiesChartTypeOption[]
+    resources: Record<UtilitiesResourceKey, UtilitiesResourceMetrics>
+    events: UtilitiesOperationalEvent[]
+    districts: UtilitiesDistrictMetric[]
+    reportTargets: UtilitiesReportTarget[]
   }
   admin: {
     totalUsers: number
