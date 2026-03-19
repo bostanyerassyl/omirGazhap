@@ -28,6 +28,8 @@ export type Profile = {
   avatarUrl: string
   companyName: string
   licenseNumber: string
+  createdAt: string | null
+  updatedAt: string | null
 }
 
 export type ProfileCreateInput = {

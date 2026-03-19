@@ -115,6 +115,7 @@ export type DashboardData = {
     chartTypes: UtilitiesChartTypeOption[]
   }
   admin: {
+    totalUsers: number
     featureRequests: FeatureRequest[]
     locationRequests: LocationRequest[]
     roleRequests: RoleRequest[]

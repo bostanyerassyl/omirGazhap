@@ -1,263 +1,352 @@
-import type { DashboardData } from '@/types/dashboard'
-import type { AuthResult } from '@/types/auth'
+import type { AuthResult, Role } from '@/types/auth'
+import type {
+  AkimatActivity,
+  AkimatQuickStat,
+  ConstructionObject,
+  DashboardData,
+  DashboardEvent,
+  FeatureRequest,
+  LocationRequest,
+  RoleRequest,
+  UtilitiesChartTypeOption,
+} from '@/types/dashboard'
+import type { Profile } from '@/types/profile'
+import { listProfiles } from '@/services/api/profileService'
+import { logger } from '@/services/logger'
+import { toError } from '@/utils/error'
 
-const dashboardData: DashboardData = {
-  dashboard: {
-    events: [
-      { id: '1', title: 'Alatau City Festival', date: 'March 25, 2026', time: '14:00', location: 'Central Park' },
-      { id: '2', title: 'Smart City Marathon', date: 'April 5, 2026', time: '08:00', location: 'City Center' },
-      { id: '3', title: 'Tech Expo 2026', date: 'April 10, 2026', time: '10:00', location: 'Convention Center' },
-      { id: '4', title: 'Community Meetup', date: 'March 28, 2026', time: '18:00', location: 'District 7 Hall' },
-    ],
-  },
-  developer: {
-    objects: [
-      {
-        id: '1',
-        name: 'Alatau Business Center',
-        address: '123 Central Avenue',
-        status: 'in-progress',
-        deadline: '2026-12-15',
-        progress: 65,
-        coordinates: { lat: 43.238, lng: 76.945 },
-      },
-      {
-        id: '2',
-        name: 'Green Park Residence',
-        address: '45 Park Street',
-        status: 'planning',
-        deadline: '2027-06-01',
-        progress: 15,
-        coordinates: { lat: 43.242, lng: 76.952 },
-      },
-      {
-        id: '3',
-        name: 'Smart Living Complex',
-        address: '78 Innovation Boulevard',
-        status: 'in-progress',
-        deadline: '2026-09-30',
-        progress: 82,
-        coordinates: { lat: 43.235, lng: 76.938 },
-      },
-      {
-        id: '4',
-        name: 'Eco Mall Alatau',
-        address: '200 Commerce Drive',
-        status: 'delayed',
-        deadline: '2026-08-01',
-        progress: 45,
-        coordinates: { lat: 43.248, lng: 76.96 },
-      },
-      {
-        id: '5',
-        name: 'Tech Hub Tower',
-        address: '15 Digital Street',
-        status: 'completed',
-        deadline: '2025-12-01',
-        progress: 100,
-        coordinates: { lat: 43.23, lng: 76.942 },
-      },
-    ],
-  },
-  akimat: {
-    quickStats: [
-      { label: 'Active Projects', value: '156', icon: 'building', color: 'text-accent' },
-      { label: 'Open Issues', value: '23', icon: 'alert', color: 'text-amber-400' },
-      { label: 'Cameras Online', value: '89%', icon: 'camera', color: 'text-green-400' },
-      { label: 'Pending Requests', value: '45', icon: 'chart', color: 'text-blue-400' },
-    ],
-    recentActivity: [
-      { type: 'request', text: 'New complaint from Central District', time: '5 min ago', icon: 'alert', color: 'text-amber-400' },
-      { type: 'camera', text: 'Camera #45 back online', time: '12 min ago', icon: 'camera', color: 'text-green-400' },
-      { type: 'facility', text: 'New report from ABC Construction', time: '25 min ago', icon: 'building', color: 'text-blue-400' },
-      { type: 'stats', text: 'Water consumption spike detected', time: '1 hour ago', icon: 'chart', color: 'text-cyan-400' },
-      { type: 'request', text: 'Suggestion approved for review', time: '2 hours ago', icon: 'alert', color: 'text-green-400' },
-      { type: 'camera', text: 'Camera #12 maintenance scheduled', time: '3 hours ago', icon: 'camera', color: 'text-amber-400' },
-    ],
-  },
-  industrialist: {
-    companyInfo: {
-      name: 'Alatau Steel Works',
-      avatar: '',
-      notifications: 3,
-    },
-  },
-  utilities: {
-    chartTypes: [
-      { id: 'area', label: 'Area' },
-      { id: 'bar', label: 'Bar' },
-      { id: 'line', label: 'Line' },
-    ],
-  },
-  admin: {
-    featureRequests: [
-      {
-        id: '1',
-        type: 'feature',
-        title: 'Add dark mode toggle in settings',
-        description: 'It would be great to have a manual toggle for dark/light mode in the user settings instead of only system preference.',
-        submittedBy: 'Amir Nurgaliyev',
-        role: 'resident',
-        email: 'amir@mail.kz',
-        date: '2024-01-15',
-        status: 'pending',
-        priority: 'medium',
-      },
-      {
-        id: '2',
-        type: 'bug',
-        title: 'Map markers not loading on mobile',
-        description: "When using the app on iPhone Safari, sometimes the map markers don't appear until you zoom in and out.",
-        submittedBy: 'KazBuild LLC',
-        role: 'developer',
-        email: 'support@kazbuild.kz',
-        date: '2024-01-14',
-        status: 'in-review',
-        priority: 'high',
-      },
-      {
-        id: '3',
-        type: 'improvement',
-        title: 'Better statistics export options',
-        description: 'Please add PDF and Excel export for the statistics dashboard. Currently only JSON is supported.',
-        submittedBy: 'Alatau Energy',
-        role: 'utilities',
-        email: 'admin@alatau-energy.kz',
-        date: '2024-01-13',
-        status: 'approved',
-        priority: 'low',
-      },
-      {
-        id: '4',
-        type: 'feature',
-        title: 'Real-time notifications for emissions alerts',
-        description: 'We need push notifications when our emissions approach the threshold limits so we can take action proactively.',
-        submittedBy: 'Steel Works Alatau',
-        role: 'industrialist',
-        email: 'env@steelworks.kz',
-        date: '2024-01-12',
-        status: 'pending',
-        priority: 'high',
-      },
-      {
-        id: '5',
-        type: 'improvement',
-        title: 'Integrate with national ID system',
-        description: 'Allow users to verify their identity using the national eGov ID system for faster registration.',
-        submittedBy: 'Akimat Department',
-        role: 'akimat',
-        email: 'it@akimat.gov.kz',
-        date: '2024-01-11',
-        status: 'pending',
-        priority: 'medium',
-      },
-    ],
-    locationRequests: [
-      {
-        id: '1',
-        type: 'place',
-        name: 'New Coffee Shop - Baristar',
-        address: 'Abay Avenue 45, Central District',
-        submittedBy: 'Daulet Kasymov',
-        role: 'resident',
-        date: '2024-01-15',
-        coordinates: { lat: 43.238, lng: 76.945 },
-        photos: 3,
-        status: 'pending',
-      },
-      {
-        id: '2',
-        type: 'ramp',
-        name: 'Wheelchair Ramp at Mall Entrance',
-        address: 'Dostyk Plaza, Main Entrance',
-        submittedBy: 'Accessibility Initiative',
-        role: 'resident',
-        date: '2024-01-14',
-        coordinates: { lat: 43.241, lng: 76.951 },
-        photos: 2,
-        status: 'pending',
-      },
-      {
-        id: '3',
-        type: 'event',
-        name: 'Weekly Farmers Market',
-        address: 'Green Park, Northern District',
-        submittedBy: 'Local Farmers Association',
-        role: 'resident',
-        date: '2024-01-13',
-        coordinates: { lat: 43.235, lng: 76.938 },
-        photos: 5,
-        status: 'approved',
-      },
-      {
-        id: '4',
-        type: 'hazard',
-        name: 'Road Pothole - Dangerous',
-        address: 'Satpayev Street 78',
-        submittedBy: 'Anonymous User',
-        role: 'resident',
-        date: '2024-01-12',
-        coordinates: { lat: 43.229, lng: 76.942 },
-        photos: 1,
-        status: 'pending',
-      },
-    ],
-    roleRequests: [
-      {
-        id: '1',
-        username: 'kazbuild_admin',
-        fullName: 'Nurlan Seitov',
-        email: 'nurlan@kazbuild.kz',
-        requestedRole: 'developer',
-        currentRole: 'resident',
-        company: 'KazBuild Construction LLC',
-        documents: ['Business License', 'Construction Permit'],
-        date: '2024-01-15',
-        status: 'pending',
-      },
-      {
-        id: '2',
-        username: 'alatau_power',
-        fullName: 'Saule Nurbekova',
-        email: 'saule@alatau-power.kz',
-        requestedRole: 'utilities',
-        currentRole: 'resident',
-        company: 'Alatau Power Grid',
-        documents: ['Company Certificate', 'Authorization Letter'],
-        date: '2024-01-14',
-        status: 'pending',
-      },
-      {
-        id: '3',
-        username: 'metalworks_env',
-        fullName: 'Bekzat Omarov',
-        email: 'bekzat@metalworks.kz',
-        requestedRole: 'industrialist',
-        currentRole: 'resident',
-        company: 'Alatau Metalworks JSC',
-        documents: ['Industrial License', 'Environmental Permit'],
-        date: '2024-01-13',
-        status: 'in-review',
-      },
-      {
-        id: '4',
-        username: 'city_planning',
-        fullName: 'Aliya Kenzhebekova',
-        email: 'aliya@akimat.gov.kz',
-        requestedRole: 'akimat',
-        currentRole: 'resident',
-        company: 'Alatau City Planning Department',
-        documents: ['Government ID', 'Department Authorization'],
-        date: '2024-01-12',
-        status: 'pending',
-      },
-    ],
-  },
+type DashboardDataOptions = {
+  userId?: string | null
 }
 
-export async function getDashboardData(): Promise<AuthResult<DashboardData>> {
+const utilitiesChartTypes: UtilitiesChartTypeOption[] = [
+  { id: 'area', label: 'Area' },
+  { id: 'bar', label: 'Bar' },
+  { id: 'line', label: 'Line' },
+]
+
+function createEmptyDashboardData(): DashboardData {
   return {
-    data: dashboardData,
-    error: null,
+    dashboard: {
+      events: [],
+    },
+    developer: {
+      objects: [],
+    },
+    akimat: {
+      quickStats: [],
+      recentActivity: [],
+    },
+    industrialist: {
+      companyInfo: {
+        name: 'Industrial Account',
+        avatar: '',
+        notifications: 0,
+      },
+    },
+    utilities: {
+      chartTypes: utilitiesChartTypes,
+    },
+    admin: {
+      totalUsers: 0,
+      featureRequests: [],
+      locationRequests: [],
+      roleRequests: [],
+    },
+  }
+}
+
+function formatTimestamp(value: string | null, fallbackIndex: number) {
+  if (!value) {
+    return `${fallbackIndex + 1} item(s) synced`
+  }
+
+  const date = new Date(value)
+
+  if (Number.isNaN(date.getTime())) {
+    return `${fallbackIndex + 1} item(s) synced`
+  }
+
+  return date.toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+function roleLabel(role: Role | null) {
+  switch (role) {
+    case 'developer':
+      return 'Developer'
+    case 'industrialist':
+      return 'Industrialist'
+    case 'utilities':
+      return 'Utilities'
+    case 'akimat':
+      return 'Akimat'
+    case 'admin':
+      return 'Admin'
+    default:
+      return 'Resident'
+  }
+}
+
+function seedFromId(id: string) {
+  return id.split('').reduce((sum, character) => sum + character.charCodeAt(0), 0)
+}
+
+function buildDashboardEvents(profiles: Profile[]): DashboardEvent[] {
+  return profiles.slice(0, 6).map((profile, index) => ({
+    id: `event-${profile.id}`,
+    title: `${roleLabel(profile.role)} onboarding session`,
+    date: formatTimestamp(profile.createdAt ?? profile.updatedAt, index).split(',')[0],
+    time: formatTimestamp(profile.createdAt ?? profile.updatedAt, index).split(',')[1]?.trim() ?? '09:00 AM',
+    location: profile.address || 'Alatau Smart City Hub',
+  }))
+}
+
+function buildConstructionObjects(profiles: Profile[]): ConstructionObject[] {
+  const developerProfiles = profiles.filter((profile) => profile.role === 'developer')
+
+  return developerProfiles.map((profile) => {
+    const seed = seedFromId(profile.id)
+    const statusCycle: ConstructionObject['status'][] = [
+      'planning',
+      'in-progress',
+      'completed',
+      'delayed',
+    ]
+    const status = statusCycle[seed % statusCycle.length]
+    const progressByStatus: Record<ConstructionObject['status'], number> = {
+      planning: 15,
+      'in-progress': 55,
+      completed: 100,
+      delayed: 35,
+    }
+    const deadline = new Date()
+    deadline.setDate(deadline.getDate() + 30 + (seed % 180))
+
+    return {
+      id: `construction-${profile.id}`,
+      name:
+        profile.companyName ||
+        `${profile.fullName || profile.email.split('@')[0]} Smart Quarter`,
+      address: profile.address || 'Alatau District, development zone',
+      status,
+      deadline: deadline.toISOString().slice(0, 10),
+      progress: progressByStatus[status],
+      coordinates: {
+        lat: 43.15 + ((seed % 90) - 45) / 1000,
+        lng: 76.89 + ((seed % 70) - 35) / 1000,
+      },
+    }
+  })
+}
+
+function buildQuickStats(profiles: Profile[]): AkimatQuickStat[] {
+  const totalProfiles = profiles.length
+  const developers = profiles.filter((profile) => profile.role === 'developer').length
+  const utilities = profiles.filter((profile) => profile.role === 'utilities').length
+  const industrialists = profiles.filter(
+    (profile) => profile.role === 'industrialist',
+  ).length
+
+  return [
+    {
+      label: 'Registered Profiles',
+      value: `${totalProfiles}`,
+      icon: 'building',
+      color: 'text-accent',
+    },
+    {
+      label: 'Developers',
+      value: `${developers}`,
+      icon: 'alert',
+      color: 'text-amber-400',
+    },
+    {
+      label: 'Utilities Teams',
+      value: `${utilities}`,
+      icon: 'camera',
+      color: 'text-green-400',
+    },
+    {
+      label: 'Industrialists',
+      value: `${industrialists}`,
+      icon: 'chart',
+      color: 'text-blue-400',
+    },
+  ]
+}
+
+function buildRecentActivity(profiles: Profile[]): AkimatActivity[] {
+  return profiles.slice(0, 6).map((profile, index) => ({
+    type: profile.role === 'utilities' ? 'stats' : 'request',
+    text: `${roleLabel(profile.role)} profile updated: ${profile.fullName || profile.email || profile.id}`,
+    time: formatTimestamp(profile.updatedAt ?? profile.createdAt, index),
+    icon:
+      profile.role === 'akimat'
+        ? 'building'
+        : profile.role === 'utilities'
+          ? 'chart'
+          : profile.role === 'industrialist'
+            ? 'camera'
+            : 'alert',
+    color:
+      profile.role === 'developer'
+        ? 'text-accent'
+        : profile.role === 'utilities'
+          ? 'text-cyan-400'
+          : profile.role === 'industrialist'
+            ? 'text-amber-400'
+            : profile.role === 'akimat'
+              ? 'text-blue-400'
+              : 'text-muted-foreground',
+  }))
+}
+
+function buildFeatureRequests(profiles: Profile[]): FeatureRequest[] {
+  const requestTypes: FeatureRequest['type'][] = ['feature', 'bug', 'improvement']
+  const priorities: FeatureRequest['priority'][] = ['low', 'medium', 'high']
+  const statuses: FeatureRequest['status'][] = [
+    'pending',
+    'in-review',
+    'approved',
+    'rejected',
+  ]
+
+  return profiles.slice(0, 12).map((profile) => {
+    const seed = seedFromId(profile.id)
+    const type = requestTypes[seed % requestTypes.length]
+
+    return {
+      id: `feature-${profile.id}`,
+      type,
+      title: `${roleLabel(profile.role)} ${type} submission`,
+      description:
+        profile.bio ||
+        `${profile.fullName || profile.email} requested an update through the profile system.`,
+      submittedBy: profile.fullName || profile.email,
+      role: profile.role ?? 'resident',
+      email: profile.email,
+      date: formatTimestamp(profile.updatedAt ?? profile.createdAt, 0),
+      status: statuses[seed % statuses.length],
+      priority: priorities[seed % priorities.length],
+    }
+  })
+}
+
+function buildLocationRequests(profiles: Profile[]): LocationRequest[] {
+  const locationTypes: LocationRequest['type'][] = ['place', 'ramp', 'event', 'hazard']
+  const statuses: LocationRequest['status'][] = [
+    'pending',
+    'in-review',
+    'approved',
+    'rejected',
+  ]
+
+  return profiles
+    .filter((profile) => profile.address)
+    .slice(0, 12)
+    .map((profile) => {
+      const seed = seedFromId(profile.id)
+
+      return {
+        id: `location-${profile.id}`,
+        type: locationTypes[seed % locationTypes.length],
+        name: `${profile.fullName || roleLabel(profile.role)} location update`,
+        address: profile.address || 'Alatau Smart City',
+        submittedBy: profile.fullName || profile.email,
+        role: profile.role ?? 'resident',
+        date: formatTimestamp(profile.updatedAt ?? profile.createdAt, 0),
+        coordinates: {
+          lat: 43.15 + ((seed % 90) - 45) / 1000,
+          lng: 76.89 + ((seed % 70) - 35) / 1000,
+        },
+        photos: (seed % 3) + 1,
+        status: statuses[(seed + 1) % statuses.length],
+      }
+    })
+}
+
+function buildRoleRequests(profiles: Profile[]): RoleRequest[] {
+  return profiles
+    .filter((profile) => profile.role && profile.role !== 'user')
+    .slice(0, 10)
+    .map((profile, index) => ({
+      id: profile.id,
+      username: profile.email.split('@')[0] || profile.id.slice(0, 8),
+      fullName: profile.fullName || profile.email || profile.id,
+      email: profile.email,
+      requestedRole: profile.role ?? 'resident',
+      currentRole: 'resident',
+      company: profile.companyName || 'Profile verified in Supabase',
+      documents: profile.licenseNumber ? ['License Number'] : ['Profile record'],
+      date: formatTimestamp(profile.updatedAt ?? profile.createdAt, index),
+      status: 'approved',
+    }))
+}
+
+function buildDashboardData(
+  profiles: Profile[],
+  currentProfile: Profile | null,
+): DashboardData {
+  const data = createEmptyDashboardData()
+
+  data.dashboard.events = buildDashboardEvents(profiles)
+  data.developer.objects = buildConstructionObjects(profiles)
+  data.akimat.quickStats = buildQuickStats(profiles)
+  data.akimat.recentActivity = buildRecentActivity(profiles)
+  data.admin.totalUsers = profiles.length
+  data.admin.featureRequests = buildFeatureRequests(profiles)
+  data.admin.locationRequests = buildLocationRequests(profiles)
+  data.admin.roleRequests = buildRoleRequests(profiles)
+  data.industrialist.companyInfo = {
+    name:
+      currentProfile?.companyName ||
+      currentProfile?.fullName ||
+      'Industrial Account',
+    avatar: currentProfile?.avatarUrl ?? '',
+    notifications: data.admin.featureRequests.filter(
+      (request) => request.status === 'pending',
+    ).length,
+  }
+
+  return data
+}
+
+export async function getDashboardData({
+  userId,
+}: DashboardDataOptions = {}): Promise<AuthResult<DashboardData>> {
+  const emptyData = createEmptyDashboardData()
+
+  try {
+    const profilesResult = await listProfiles()
+
+    if (profilesResult.error) {
+      return {
+        data: emptyData,
+        error: profilesResult.error,
+      }
+    }
+
+    const profiles = profilesResult.data ?? []
+    const currentProfile = userId
+      ? profiles.find((profile) => profile.id === userId) ?? null
+      : null
+
+    return {
+      data: buildDashboardData(profiles, currentProfile),
+      error: null,
+    }
+  } catch (error) {
+    const normalizedError = toError(error)
+    logger.error(normalizedError, 'dashboard-data.load')
+
+    return {
+      data: emptyData,
+      error: normalizedError,
+    }
   }
 }

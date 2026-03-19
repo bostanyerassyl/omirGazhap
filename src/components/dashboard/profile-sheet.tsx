@@ -4,6 +4,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { StatusMessage } from "@/components/ui/status-message"
 import { Textarea } from "@/components/ui/textarea"
 import {
   Sheet,
@@ -36,6 +37,8 @@ export function ProfileSheet() {
   })
   const [isEditing, setIsEditing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
+  const [saveSuccess, setSaveSuccess] = useState<string | null>(null)
 
   useEffect(() => {
     if (!authProfile) {
@@ -65,7 +68,9 @@ export function ProfileSheet() {
 
   const handleSave = async () => {
     setIsSaving(true)
-    await updateProfile({
+    setSaveError(null)
+    setSaveSuccess(null)
+    const result = await updateProfile({
       fullName: profile.name,
       email: profile.email,
       phone: profile.phone,
@@ -74,6 +79,13 @@ export function ProfileSheet() {
       avatarUrl: profile.avatar,
     })
     setIsSaving(false)
+
+    if (result.error) {
+      setSaveError(result.error.message)
+      return
+    }
+
+    setSaveSuccess("Profile saved successfully.")
     setIsEditing(false)
   }
 
@@ -103,6 +115,12 @@ export function ProfileSheet() {
         </SheetHeader>
         
         <div className="mt-6 space-y-6">
+          {saveError ? (
+            <StatusMessage tone="error">{saveError}</StatusMessage>
+          ) : null}
+          {saveSuccess ? (
+            <StatusMessage tone="success">{saveSuccess}</StatusMessage>
+          ) : null}
           {/* Avatar section */}
           <div className="flex flex-col items-center gap-4">
             <div className="relative">
@@ -208,7 +226,11 @@ export function ProfileSheet() {
                 <Button 
                   variant="outline" 
                   className="flex-1 border-border text-foreground hover:bg-secondary"
-                  onClick={() => setIsEditing(false)}
+                  onClick={() => {
+                    setIsEditing(false)
+                    setSaveError(null)
+                    setSaveSuccess(null)
+                  }}
                 >
                   Cancel
                 </Button>

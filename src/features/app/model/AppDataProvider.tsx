@@ -1,11 +1,13 @@
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
   useState,
   type PropsWithChildren,
 } from 'react'
+import { useAuth } from '@/features/auth/model/AuthProvider'
 import { getDashboardData } from '@/services/data/dashboardDataService'
 import { logger } from '@/services/logger'
 import type {
@@ -19,6 +21,7 @@ type AppDataContextValue = {
   data: DashboardData | null
   loading: boolean
   error: string | null
+  reloadData: () => Promise<void>
   updateDeveloperObject: (object: ConstructionObject) => void
   reviewAdminItem: (
     target: AdminReviewTarget,
@@ -30,35 +33,38 @@ type AppDataContextValue = {
 const AppDataContext = createContext<AppDataContextValue | null>(null)
 
 export function AppDataProvider({ children }: PropsWithChildren) {
+  const { user } = useAuth()
   const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    async function loadData() {
-      setLoading(true)
-      const result = await getDashboardData()
+  const loadData = useCallback(async () => {
+    setLoading(true)
+    const result = await getDashboardData({
+      userId: user?.id ?? null,
+    })
 
-      if (result.error) {
-        logger.error(result.error, 'app-data.load')
-        setError(result.error.message)
-        setLoading(false)
-        return
-      }
-
-      setData(result.data)
+    if (result.error) {
+      logger.error(result.error, 'app-data.load')
+      setError(result.error.message)
+    } else {
       setError(null)
-      setLoading(false)
     }
 
+    setData(result.data)
+    setLoading(false)
+  }, [user?.id])
+
+  useEffect(() => {
     void loadData()
-  }, [])
+  }, [loadData])
 
   const value = useMemo<AppDataContextValue>(
     () => ({
       data,
       loading,
       error,
+      reloadData: loadData,
       updateDeveloperObject(object) {
         setData((current) => {
           if (!current) {
@@ -120,7 +126,7 @@ export function AppDataProvider({ children }: PropsWithChildren) {
         })
       },
     }),
-    [data, error, loading],
+    [data, error, loadData, loading],
   )
 
   return (

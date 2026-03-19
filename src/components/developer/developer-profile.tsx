@@ -12,6 +12,7 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { StatusMessage } from "@/components/ui/status-message"
 import { Textarea } from "@/components/ui/textarea"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { FieldGroup, Field, FieldLabel } from "@/components/ui/field"
@@ -27,6 +28,8 @@ import {
 export function DeveloperProfile() {
   const [isEditing, setIsEditing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
+  const [saveSuccess, setSaveSuccess] = useState<string | null>(null)
   const { logout, profile: authProfile, updateProfile } = useAuth()
   const [profile, setProfile] = useState({
     name: "Alatau Development Corp",
@@ -56,7 +59,9 @@ export function DeveloperProfile() {
 
   const handleSave = async () => {
     setIsSaving(true)
-    await updateProfile({
+    setSaveError(null)
+    setSaveSuccess(null)
+    const result = await updateProfile({
       fullName: profile.name,
       email: profile.email,
       phone: profile.phone,
@@ -66,6 +71,13 @@ export function DeveloperProfile() {
       licenseNumber: profile.licenseNumber,
     })
     setIsSaving(false)
+
+    if (result.error) {
+      setSaveError(result.error.message)
+      return
+    }
+
+    setSaveSuccess("Profile saved successfully.")
     setIsEditing(false)
   }
 
@@ -90,6 +102,12 @@ export function DeveloperProfile() {
         </SheetHeader>
 
         <div className="p-6 space-y-6 overflow-y-auto max-h-[calc(100vh-180px)]">
+          {saveError ? (
+            <StatusMessage tone="error">{saveError}</StatusMessage>
+          ) : null}
+          {saveSuccess ? (
+            <StatusMessage tone="success">{saveSuccess}</StatusMessage>
+          ) : null}
           {/* Avatar Section */}
           <div className="flex flex-col items-center">
             <div className="relative">
@@ -221,7 +239,11 @@ export function DeveloperProfile() {
             <div className="flex gap-2">
               <Button
                 variant="outline"
-                onClick={() => setIsEditing(false)}
+                onClick={() => {
+                  setIsEditing(false)
+                  setSaveError(null)
+                  setSaveSuccess(null)
+                }}
                 className="flex-1 border-border"
               >
                 Cancel

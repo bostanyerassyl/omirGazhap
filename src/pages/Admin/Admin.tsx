@@ -27,6 +27,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import { StatusMessage } from "@/components/ui/status-message"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   DropdownMenu,
@@ -84,7 +85,7 @@ const roleLabels: Record<string, string> = {
 
 export default function AdminDashboard() {
   const { logout } = useAuth()
-  const { data, reviewAdminItem } = useDashboardData("admin")
+  const { data, error, reloadData, reviewAdminItem } = useDashboardData("admin")
   const [activeTab, setActiveTab] = useState("requests")
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
@@ -128,7 +129,7 @@ export default function AdminDashboard() {
     pendingRequests: featureRequests.filter(r => r.status === "pending").length,
     pendingLocations: locationRequests.filter(r => r.status === "pending").length,
     pendingRoles: roleRequests.filter(r => r.status === "pending").length,
-    totalUsers: 15234
+    totalUsers: data?.totalUsers ?? 0,
   }
 
   const openDialog = (item: FeatureRequest | LocationRequest | RoleRequest, type: AdminReviewTarget) => {
@@ -228,6 +229,16 @@ export default function AdminDashboard() {
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-6">
+        {error ? (
+          <div className="mb-6">
+            <StatusMessage tone="error" className="flex items-center justify-between gap-3">
+              <span>{error}</span>
+              <Button variant="outline" size="sm" onClick={() => void reloadData()}>
+                Retry
+              </Button>
+            </StatusMessage>
+          </div>
+        ) : null}
         {/* Quick Stats */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
           <Card className="bg-card border-border">

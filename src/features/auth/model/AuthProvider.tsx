@@ -15,7 +15,6 @@ import type {
 } from '@/types/auth'
 import type { ProfileUpdateInput } from '@/types/profile'
 import {
-  persistAuthSnapshot,
   restoreSession as restoreAuthSession,
   signIn,
   signOut,
@@ -73,8 +72,6 @@ async function hydrateProfile(
   const profileResult = await getProfile(data.user.id)
 
   if (!profileResult.error) {
-    persistAuthSnapshot(data.user, profileResult.data?.role ?? null)
-
     return {
       data: {
         ...data,
@@ -113,8 +110,6 @@ async function hydrateProfile(
       error: createdProfile.error,
     }
   }
-
-  persistAuthSnapshot(data.user, createdProfile.data?.role ?? null)
 
   return {
     data: {
@@ -203,8 +198,6 @@ export function AuthProvider({ children }: PropsWithChildren) {
           error: result.error,
         }
       }
-
-      persistAuthSnapshot(state.user, result.data?.role ?? null)
 
       const nextState = {
         session: null,

@@ -7,6 +7,7 @@ import { RouteSearch } from "@/components/dashboard/route-search"
 import { MapFilters } from "@/components/dashboard/map-filters"
 import { Calendar } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { StatusMessage } from "@/components/ui/status-message"
 import { useDashboardData } from "@/features/dashboard/model/useDashboardData"
 import {
   Sheet,
@@ -66,7 +67,7 @@ function EventsSheet({ events }: { events: Array<{ id: string; title: string; da
 }
 
 export default function DashboardPage() {
-  const { data } = useDashboardData("dashboard")
+  const { data, error, reloadData } = useDashboardData("dashboard")
   const [filters, setFilters] = useState<FilterState>({
     ramps: true,
     scooters: true,
@@ -113,6 +114,17 @@ export default function DashboardPage() {
 
       {/* Main map */}
       <CityMap filters={filters} />
+
+      {error ? (
+        <div className="absolute left-4 right-4 top-20 z-30 md:left-auto md:right-4 md:w-[420px]">
+          <StatusMessage tone="error" className="flex items-center justify-between gap-3">
+            <span>{error}</span>
+            <Button variant="outline" size="sm" onClick={() => void reloadData()}>
+              Retry
+            </Button>
+          </StatusMessage>
+        </div>
+      ) : null}
 
       {/* Bottom search bar */}
       <RouteSearch />

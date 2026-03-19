@@ -14,6 +14,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Badge } from "@/components/ui/badge"
+import { StatusMessage } from "@/components/ui/status-message"
 import { IndustrialistNav } from "@/components/industrialist/industrialist-nav"
 import { EmissionsSection } from "@/components/industrialist/emissions-section"
 import { ProductionSection } from "@/components/industrialist/production-section"
@@ -24,7 +25,7 @@ import { useDashboardData } from "@/features/dashboard/model/useDashboardData"
 export default function IndustrialistDashboard() {
   const [activeTab, setActiveTab] = useState("emissions")
   const { logout } = useAuth()
-  const { data } = useDashboardData("industrialist")
+  const { data, error, reloadData } = useDashboardData("industrialist")
   const companyInfo = data?.companyInfo ?? {
     name: "Industrial Account",
     avatar: "",
@@ -114,6 +115,14 @@ export default function IndustrialistDashboard() {
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-6 space-y-6">
+        {error ? (
+          <StatusMessage tone="error" className="flex items-center justify-between gap-3">
+            <span>{error}</span>
+            <Button variant="outline" size="sm" onClick={() => void reloadData()}>
+              Retry
+            </Button>
+          </StatusMessage>
+        ) : null}
         {/* Navigation */}
         <IndustrialistNav activeTab={activeTab} onTabChange={setActiveTab} />
 

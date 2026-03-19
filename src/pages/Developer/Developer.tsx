@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { Send, CheckCircle2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { StatusMessage } from "@/components/ui/status-message"
 import { ObjectsList } from "@/components/developer/objects-list"
 import { ObjectEditor } from "@/components/developer/object-editor"
 import { DeveloperMap } from "@/components/developer/developer-map"
@@ -9,7 +10,7 @@ import { useDashboardData } from "@/features/dashboard/model/useDashboardData"
 import type { ConstructionObject } from "@/types/dashboard"
 
 export default function DeveloperDashboard() {
-  const { data, loading, updateDeveloperObject } = useDashboardData("developer")
+  const { data, loading, error, reloadData, updateDeveloperObject } = useDashboardData("developer")
   const [selectedObject, setSelectedObject] = useState<ConstructionObject | undefined>()
   const [isEditorOpen, setIsEditorOpen] = useState(false)
   const [reportSent, setReportSent] = useState(false)
@@ -49,51 +50,61 @@ export default function DeveloperDashboard() {
 
       {/* Top Bar */}
       <div className="absolute top-0 left-0 right-0 z-20 p-4">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-3">
+          {error ? (
+            <StatusMessage tone="error" className="flex items-center justify-between gap-3">
+              <span>{error}</span>
+              <Button variant="outline" size="sm" onClick={() => void reloadData()}>
+                Retry
+              </Button>
+            </StatusMessage>
+          ) : null}
+          <div className="flex items-center justify-between">
           {/* Left side - Profile & Objects */}
-          <div className="flex items-center gap-3">
-            <DeveloperProfile />
-            <ObjectsList 
-              objects={objects}
-              onSelectObject={handleSelectObject}
-              selectedObjectId={selectedObject?.id}
-            />
-          </div>
-
-          {/* Center - Logo */}
-          <div className="absolute left-1/2 -translate-x-1/2 hidden md:flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg bg-accent/20 flex items-center justify-center">
-              <svg viewBox="0 0 24 24" className="h-5 w-5 text-accent" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M12 2L2 7l10 5 10-5-10-5z" />
-                <path d="M2 17l10 5 10-5" />
-                <path d="M2 12l10 5 10-5" />
-              </svg>
+            <div className="flex items-center gap-3">
+              <DeveloperProfile />
+              <ObjectsList 
+                objects={objects}
+                onSelectObject={handleSelectObject}
+                selectedObjectId={selectedObject?.id}
+              />
             </div>
-            <div>
-              <span className="text-lg font-semibold text-foreground tracking-tight">Alatau</span>
-              <span className="text-xs text-muted-foreground ml-1">Developer Portal</span>
-            </div>
-          </div>
 
-          {/* Right side - Report to Akimat */}
-          <Button 
-            variant="default" 
-            className="gap-2 bg-accent text-accent-foreground hover:bg-accent/90"
-            onClick={handleSendReport}
-            disabled={reportSent}
-          >
-            {reportSent ? (
-              <>
-                <CheckCircle2 className="w-4 h-4" />
-                <span className="hidden sm:inline">Sent!</span>
-              </>
-            ) : (
-              <>
-                <Send className="w-4 h-4" />
-                <span className="hidden sm:inline">Report to Akimat</span>
-              </>
-            )}
-          </Button>
+            {/* Center - Logo */}
+            <div className="absolute left-1/2 -translate-x-1/2 hidden md:flex items-center gap-2">
+              <div className="h-8 w-8 rounded-lg bg-accent/20 flex items-center justify-center">
+                <svg viewBox="0 0 24 24" className="h-5 w-5 text-accent" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M12 2L2 7l10 5 10-5-10-5z" />
+                  <path d="M2 17l10 5 10-5" />
+                  <path d="M2 12l10 5 10-5" />
+                </svg>
+              </div>
+              <div>
+                <span className="text-lg font-semibold text-foreground tracking-tight">Alatau</span>
+                <span className="text-xs text-muted-foreground ml-1">Developer Portal</span>
+              </div>
+            </div>
+
+            {/* Right side - Report to Akimat */}
+            <Button 
+              variant="default" 
+              className="gap-2 bg-accent text-accent-foreground hover:bg-accent/90"
+              onClick={handleSendReport}
+              disabled={reportSent}
+            >
+              {reportSent ? (
+                <>
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span className="hidden sm:inline">Sent!</span>
+                </>
+              ) : (
+                <>
+                  <Send className="w-4 h-4" />
+                  <span className="hidden sm:inline">Report to Akimat</span>
+                </>
+              )}
+            </Button>
+          </div>
         </div>
       </div>
 

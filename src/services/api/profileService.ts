@@ -30,6 +30,8 @@ function normalizeProfile(record: ProfileRecord): Profile {
     avatarUrl: record.avatar_url ?? '',
     companyName: record.company_name ?? '',
     licenseNumber: record.license_number ?? '',
+    createdAt: record.created_at ?? null,
+    updatedAt: record.updated_at ?? null,
   }
 }
 
@@ -87,6 +89,30 @@ export async function getProfile(userId: string): Promise<AuthResult<Profile>> {
     }
   } catch (error) {
     return toProfileError<Profile>(error, 'profile.get')
+  }
+}
+
+export async function listProfiles(): Promise<AuthResult<Profile[]>> {
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .order('updated_at', { ascending: false })
+      .returns<ProfileRecord[]>()
+
+    if (error) {
+      return {
+        data: null,
+        error,
+      }
+    }
+
+    return {
+      data: (data ?? []).map(normalizeProfile),
+      error: null,
+    }
+  } catch (error) {
+    return toProfileError<Profile[]>(error, 'profile.list')
   }
 }
 

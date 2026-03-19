@@ -12,6 +12,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { StatusMessage } from "@/components/ui/status-message"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -31,7 +32,7 @@ import { useDashboardData } from "@/features/dashboard/model/useDashboardData"
 export default function AkimatDashboard() {
   const [notifications] = useState(5)
   const { logout } = useAuth()
-  const { data } = useDashboardData("akimat")
+  const { data, error, reloadData } = useDashboardData("akimat")
 
   const iconMap = {
     building: Building2,
@@ -121,6 +122,16 @@ export default function AkimatDashboard() {
 
       {/* Main Content - Dashboard Grid */}
       <main className="container mx-auto px-4 py-6">
+        {error ? (
+          <div className="mb-6">
+            <StatusMessage tone="error" className="flex items-center justify-between gap-3">
+              <span>{error}</span>
+              <Button variant="outline" size="sm" onClick={() => void reloadData()}>
+                Retry
+              </Button>
+            </StatusMessage>
+          </div>
+        ) : null}
         {/* Quick Stats */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           {(data?.quickStats ?? []).map((stat) => {
