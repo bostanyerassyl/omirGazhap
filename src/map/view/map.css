@@ -15,7 +15,7 @@
   top: 84px;
   left: 50%;
   transform: translateX(-50%);
-  z-index: 60;
+  z-index: 40;
   display: flex;
   gap: 6px;
 }
@@ -42,7 +42,7 @@
   width: 320px;
   max-width: calc(100% - 24px);
   max-height: calc(100% - 24px);
-  z-index: 55;
+  z-index: 45;
   background: rgba(15, 23, 42, 0.94);
   border: 1px solid #334155;
   border-radius: 12px;

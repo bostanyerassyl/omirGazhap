@@ -11,16 +11,7 @@ interface InteractiveMapViewProps {
 
 export function InteractiveMapView({ toolbarTop = 84, showDrawToolbar }: InteractiveMapViewProps) {
   const { role } = useAuth()
-  const resolvedRole = role ?? ""
-  const roleCanEdit = new Set([
-    "admin",
-    "akimat",
-    "government_official",
-    "government-official",
-    "utilities",
-    "industrialist",
-  ]).has(resolvedRole)
-  const canEditMap = showDrawToolbar ?? roleCanEdit
+  const canEditMap = Boolean(showDrawToolbar)
 
   useEffect(() => {
     let teardown: null | (() => void) = null

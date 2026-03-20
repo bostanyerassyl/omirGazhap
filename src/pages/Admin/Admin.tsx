@@ -50,6 +50,7 @@ import { useAuth } from "@/features/auth/model/AuthProvider"
 import { adminReviewSchema } from "@/features/admin/model/admin.schema"
 import { useDashboardData } from "@/features/dashboard/model/useDashboardData"
 import { cn } from "@/utils/cn"
+import { AdminProfileSheet } from "@/components/admin/admin-profile-sheet"
 import type {
   AdminReviewTarget,
   FeatureRequest,
@@ -84,8 +85,9 @@ const roleLabels: Record<string, string> = {
 }
 
 export default function AdminDashboard() {
-  const { logout } = useAuth()
+  const { logout, profile } = useAuth()
   const { data, error, reloadData, reviewAdminItem } = useDashboardData("admin")
+  const [isProfileOpen, setIsProfileOpen] = useState(false)
   const [activeTab, setActiveTab] = useState("requests")
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
@@ -98,6 +100,15 @@ export default function AdminDashboard() {
   const featureRequests = data?.featureRequests ?? []
   const locationRequests = data?.locationRequests ?? []
   const roleRequests = data?.roleRequests ?? []
+  const profileName = profile?.fullName || "System Administrator"
+  const profileEmail = profile?.email || "admin@alatau.system"
+  const profileAvatar = profile?.avatarUrl || ""
+  const profileInitials = profileName
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? "")
+    .join("") || "AD"
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -184,9 +195,9 @@ export default function AdminDashboard() {
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="relative h-9 w-9 rounded-full">
                 <Avatar className="h-9 w-9 border-2 border-red-500">
-                  <AvatarImage src="" alt="Admin" />
+                  <AvatarImage src={profileAvatar} alt={profileName} />
                   <AvatarFallback className="bg-red-500 text-white font-medium">
-                    AD
+                    {profileInitials}
                   </AvatarFallback>
                 </Avatar>
               </Button>
@@ -194,12 +205,12 @@ export default function AdminDashboard() {
             <DropdownMenuContent className="w-56" align="start">
               <DropdownMenuLabel>
                 <div className="flex flex-col space-y-1">
-                  <p className="text-sm font-medium">System Administrator</p>
-                  <p className="text-xs text-muted-foreground">admin@alatau.system</p>
+                  <p className="text-sm font-medium">{profileName}</p>
+                  <p className="text-xs text-muted-foreground">{profileEmail}</p>
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => setIsProfileOpen(true)}>
                 <User className="mr-2 h-4 w-4" />
                 <span>Profile</span>
               </DropdownMenuItem>
@@ -536,6 +547,8 @@ export default function AdminDashboard() {
         </Tabs>
       </main>
 
+      <AdminProfileSheet open={isProfileOpen} onOpenChange={setIsProfileOpen} />
+
       {/* Review Dialog */}
       <Dialog open={!!selectedItem} onOpenChange={() => { setSelectedItem(null); setDialogType(null); }}>
         <DialogContent className="max-w-lg bg-card border-border">
@@ -619,6 +632,3 @@ export default function AdminDashboard() {
     </div>
   )
 }
-
-
-
