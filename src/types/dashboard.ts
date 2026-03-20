@@ -274,6 +274,7 @@ export type LocationRequest = {
 
 export type RoleRequest = {
   id: string
+  userId: string
   username: string
   fullName: string
   email: string

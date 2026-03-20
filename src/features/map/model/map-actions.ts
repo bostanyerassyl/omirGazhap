@@ -36,6 +36,10 @@ export type MapFilterState = {
   friends: boolean
   events: boolean
   buses: boolean
+  points: boolean
+  fire: boolean
+  water: boolean
+  electricity: boolean
 }
 
 export type MapPointPickResult = {
@@ -85,6 +89,10 @@ let latestFilters: MapFilterState = {
   friends: true,
   events: true,
   buses: true,
+  points: true,
+  fire: true,
+  water: true,
+  electricity: true,
 }
 
 export function registerMapActionHandlers(next: Partial<MapActionHandlers>) {

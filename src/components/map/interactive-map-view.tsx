@@ -84,6 +84,9 @@ export function InteractiveMapView({ toolbarTop = 84, showDrawToolbar }: Interac
                   <button className="icon-btn" data-icon="🚦">🚦</button>
                   <button className="icon-btn" data-icon="🔴">🔴</button>
                   <button className="icon-btn" data-icon="🟢">🟢</button>
+                  <button className="icon-btn" data-icon="🔥">🔥</button>
+                  <button className="icon-btn" data-icon="💦">💦</button>
+                  <button className="icon-btn" data-icon="⚡">⚡</button>
                   <button className="icon-btn" data-icon="custom">Custom</button>
                 </div>
                 <input type="file" id="icon-upload" accept="image/*,.svg" style={{ display: "none" }} />

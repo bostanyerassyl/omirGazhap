@@ -7,6 +7,7 @@ import {
   setActiveBanner,
   setActiveContext,
 } from './sidebar.js';
+import { poiService } from '@/services/domain/poiService'
 
 const STORAGE_KEY = 'alatau.map.poi.v1';
 const poiMarkers = new Map();
@@ -46,12 +47,56 @@ function safeWriteStorage() {
 }
 
 function normalizeCategory(value) {
-  const candidate = String(value ?? '').trim();
-  return CATEGORY_META[candidate] ? candidate : null;
+  const candidate = String(value ?? '').trim().toLowerCase();
+  const aliasMap = {
+    ramp: 'ramps',
+    ramps: 'ramps',
+    scooter: 'scooters',
+    scooters: 'scooters',
+    event: 'events',
+    events: 'events',
+    bus: 'buses',
+    buses: 'buses',
+    bus_stop: 'buses',
+    busstop: 'buses',
+  };
+  const normalized = aliasMap[candidate] ?? candidate;
+  return CATEGORY_META[normalized] ? normalized : null;
 }
 
 function isFiniteCoord(value) {
   return Number.isFinite(Number(value));
+}
+
+function isValidLatLng(latitude, longitude) {
+  return (
+    Number.isFinite(latitude)
+    && Number.isFinite(longitude)
+    && latitude >= -90
+    && latitude <= 90
+    && longitude >= -180
+    && longitude <= 180
+  );
+}
+
+function normalizePoiItem(raw) {
+  const category = normalizeCategory(raw?.category);
+  const name = String(raw?.name ?? '').trim();
+  const latitude = Number(raw?.latitude);
+  const longitude = Number(raw?.longitude);
+
+  if (!category || !name || !isValidLatLng(latitude, longitude)) return null;
+
+  return {
+    id: String(raw?.id ?? '').trim() || crypto.randomUUID(),
+    category,
+    name,
+    description: String(raw?.description ?? '').trim() || null,
+    latitude,
+    longitude,
+    image: raw?.image ?? null,
+    created_at: raw?.created_at ?? new Date().toISOString(),
+  };
 }
 
 function shouldShow(item) {
@@ -106,8 +151,29 @@ function renderAll(map) {
 
 export async function loadPoi(map) {
   activeMap = map;
-  poiItems = safeReadStorage();
-  renderAll(map);
+
+  // attempt to load from DB first
+  let remoteItems = []
+  try {
+    const result = await poiService.list()
+    if (result.data && !result.error) {
+      remoteItems = result.data
+    }
+  } catch (e) {
+    // ignore; fallback to localStorage
+  }
+
+  // merge with localStorage cache (avoid duplicates)
+  const localItems = safeReadStorage().map(normalizePoiItem).filter(Boolean)
+
+  const byId = new Map()
+  for (const item of [...remoteItems, ...localItems]) {
+    byId.set(item.id, item)
+  }
+
+  poiItems = Array.from(byId.values())
+  safeWriteStorage()
+  renderAll(map)
 }
 
 export async function addPoi(input) {
@@ -121,8 +187,32 @@ export async function addPoi(input) {
   if (!isFiniteCoord(latitude) || !isFiniteCoord(longitude)) {
     return { ok: false, error: 'Latitude and longitude are required' };
   }
+  if (!isValidLatLng(latitude, longitude)) {
+    return { ok: false, error: 'Coordinates are out of range' };
+  }
 
-  const item = {
+  const duplicate = poiItems.find((existing) => {
+    const sameCategory = existing.category === category;
+    const sameName = existing.name.toLowerCase() === name.toLowerCase();
+    const closeEnough =
+      Math.abs(Number(existing.latitude) - latitude) < 0.00001
+      && Math.abs(Number(existing.longitude) - longitude) < 0.00001;
+    return sameCategory && sameName && closeEnough;
+  });
+
+  if (duplicate) {
+    const updated = {
+      ...duplicate,
+      description: String(input?.description ?? '').trim() || null,
+      created_at: new Date().toISOString(),
+    };
+    poiItems = poiItems.map((existing) => (existing.id === duplicate.id ? updated : existing));
+    safeWriteStorage();
+    if (activeMap) upsertPoiMarker(activeMap, updated);
+    return { ok: true };
+  }
+
+  const localItem = {
     id: crypto.randomUUID(),
     category,
     name,
@@ -133,9 +223,40 @@ export async function addPoi(input) {
     created_at: new Date().toISOString(),
   };
 
-  poiItems = [item, ...poiItems];
+  // Persist to backend (best-effort); keep local copy regardless.
+  try {
+    const createResult = await poiService.create({
+      category,
+      name,
+      description: localItem.description,
+      latitude,
+      longitude,
+      createdBy: null,
+    });
+
+    if (createResult.data && !createResult.error) {
+      // prefer DB id; preserve existing marker style
+      const dbItem = {
+        ...localItem,
+        id: createResult.data.id,
+        created_at: createResult.data.createdAt,
+      };
+      poiItems = [dbItem, ...poiItems];
+      if (activeMap) upsertPoiMarker(activeMap, dbItem);
+    } else {
+      poiItems = [localItem, ...poiItems];
+      if (activeMap) upsertPoiMarker(activeMap, localItem);
+      if (createResult.error) {
+        console.warn('poi.create failed, falling back to localStorage', createResult.error);
+      }
+    }
+  } catch (err) {
+    poiItems = [localItem, ...poiItems];
+    if (activeMap) upsertPoiMarker(activeMap, localItem);
+    console.warn('poi.create threw, falling back to localStorage', err);
+  }
+
   safeWriteStorage();
-  if (activeMap) upsertPoiMarker(activeMap, item);
   return { ok: true };
 }
 

@@ -8,6 +8,10 @@ export interface FilterState {
   friends: boolean
   events: boolean
   buses: boolean
+  points: boolean
+  fire: boolean
+  water: boolean
+  electricity: boolean
 }
 
 interface CityMapProps {

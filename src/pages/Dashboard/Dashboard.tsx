@@ -73,6 +73,10 @@ export default function DashboardPage() {
     friends: true,
     events: true,
     buses: true,
+    points: true,
+    fire: true,
+    water: true,
+    electricity: true,
   })
 
   return (

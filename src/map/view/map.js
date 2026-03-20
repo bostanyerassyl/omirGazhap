@@ -1,6 +1,6 @@
 import maplibregl from 'maplibre-gl';
 import { openBuildingSidebar } from './buildings.js';
-import { openFeatureSidebar, setupDraw } from './features.js';
+import { openFeatureSidebar, setFeaturePointFilters, setupDraw } from './features.js';
 import { addFriend, loadFriends, setFriendsVisibility, teardownFriends } from './friends.js';
 import { addPoi, loadPoi, setPoiVisibility, teardownPoi } from './poi.js';
 import { closeSidebar } from './sidebar.js';
@@ -235,9 +235,15 @@ export async function initializeMapView() {
         longitude: Number.isFinite(longitude) ? longitude : center.lng,
       });
     },
-    setFilters: ({ ramps, scooters, friends, events, buses }) => {
+    setFilters: ({ ramps, scooters, friends, events, buses, points, fire, water, electricity }) => {
       setFriendsVisibility(friends);
       setPoiVisibility({ ramps, scooters, events, buses });
+      setFeaturePointFilters({
+        points: points ?? true,
+        fire: fire ?? true,
+        water: water ?? true,
+        electricity: electricity ?? true,
+      });
     },
     setDeveloperObjects: (items) => {
       setDeveloperObjects(items ?? []);
@@ -347,7 +353,9 @@ export async function initializeMapView() {
       const selectedDrawFeatures = draw.getSelected().features;
 
       if (drawFeatureIds.length > 0) {
-        const clickedFeature = draw.get(drawFeatureIds[0]);
+        const clickedFeature = drawFeatureIds
+          .map((id) => draw.get(id))
+          .find((item) => item && item.properties?.point_hidden !== true);
         if (!clickedFeature) return;
         map.getSource('selected-source').setData(emptyFC());
         openFeatureSidebar(clickedFeature, draw, map);
@@ -364,9 +372,11 @@ export async function initializeMapView() {
         });
         openBuildingSidebar(key, feature.properties ?? {});
 
-      } else if (selectedDrawFeatures.length > 0) {
+      } else if (selectedDrawFeatures.some((item) => item?.properties?.point_hidden !== true)) {
+        const selectedVisibleFeature = selectedDrawFeatures.find((item) => item?.properties?.point_hidden !== true);
+        if (!selectedVisibleFeature) return;
         map.getSource('selected-source').setData(emptyFC());
-        openFeatureSidebar(selectedDrawFeatures[0], draw, map);
+        openFeatureSidebar(selectedVisibleFeature, draw, map);
 
       } else {
         map.getSource('selected-source').setData(emptyFC());

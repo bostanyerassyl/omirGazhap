@@ -1,4 +1,4 @@
-﻿import { useState } from "react"
+﻿import { useEffect, useState } from "react"
 import { 
   User,
   LogOut,
@@ -51,6 +51,9 @@ import { adminReviewSchema } from "@/features/admin/model/admin.schema"
 import { useDashboardData } from "@/features/dashboard/model/useDashboardData"
 import { cn } from "@/utils/cn"
 import { AdminProfileSheet } from "@/components/admin/admin-profile-sheet"
+import { listProfiles, updateProfile as updateUserProfile } from "@/services/api/profileService"
+import type { Role } from "@/types/auth"
+import type { Profile } from "@/types/profile"
 import type {
   AdminReviewTarget,
   FeatureRequest,
@@ -70,19 +73,32 @@ const typeIcons: Record<string, typeof Lightbulb> = {
 
 const roleIcons: Record<string, typeof User> = {
   resident: User,
+  user: User,
   developer: Building2,
   utilities: Zap,
   akimat: Shield,
   industrialist: Factory,
+  admin: Shield,
 }
 
 const roleLabels: Record<string, string> = {
   resident: "Resident",
+  user: "Resident",
   developer: "Developer",
   utilities: "ЖКХ",
   akimat: "Akimat",
   industrialist: "Industrialist",
+  admin: "Admin",
 }
+
+const roleOptions: Array<{ value: Role | "resident"; label: string }> = [
+  { value: "resident", label: "Resident" },
+  { value: "developer", label: "Developer" },
+  { value: "utilities", label: "Utilities" },
+  { value: "akimat", label: "Akimat" },
+  { value: "industrialist", label: "Industrialist" },
+  { value: "admin", label: "Admin" },
+]
 
 export default function AdminDashboard() {
   const { logout, profile } = useAuth()
@@ -96,6 +112,13 @@ export default function AdminDashboard() {
   const [adminNote, setAdminNote] = useState("")
   const [adminNoteError, setAdminNoteError] = useState<string | null>(null)
   const [isSubmittingReview, setIsSubmittingReview] = useState(false)
+  const [roleDrafts, setRoleDrafts] = useState<Record<string, Role | "resident">>({})
+  const [roleUpdateState, setRoleUpdateState] = useState<
+    Record<string, { loading: boolean; message: string | null; error: boolean }>
+  >({})
+  const [directoryProfiles, setDirectoryProfiles] = useState<Profile[]>([])
+  const [directoryError, setDirectoryError] = useState<string | null>(null)
+  const [directoryLoading, setDirectoryLoading] = useState(false)
 
   const featureRequests = data?.featureRequests ?? []
   const locationRequests = data?.locationRequests ?? []
@@ -149,6 +172,73 @@ export default function AdminDashboard() {
     setDialogType(type)
     setAdminNote("")
     setAdminNoteError(null)
+  }
+
+  useEffect(() => {
+    if (activeTab !== "roles") {
+      return
+    }
+    if (directoryProfiles.length > 0 || directoryLoading) {
+      return
+    }
+    void (async () => {
+      setDirectoryLoading(true)
+      const result = await listProfiles()
+      setDirectoryLoading(false)
+      if (result.error) {
+        setDirectoryError(result.error.message)
+        return
+      }
+      setDirectoryError(null)
+      setDirectoryProfiles(result.data ?? [])
+    })()
+  }, [activeTab, directoryLoading, directoryProfiles.length])
+
+  const normalizeCurrentRole = (roleValue: Role | "resident" | null | undefined): Role | "resident" => {
+    if (roleValue === "user" || roleValue === "resident" || !roleValue) {
+      return "resident"
+    }
+    return roleValue
+  }
+
+  const getDraftRole = (userId: string, currentRole: Role | "resident"): Role | "resident" => {
+    return roleDrafts[userId] ?? normalizeCurrentRole(currentRole)
+  }
+
+  const handleDirectRoleApply = async ({
+    userId,
+    currentRole,
+  }: {
+    userId: string
+    currentRole: Role | "resident"
+  }) => {
+    const targetRole = getDraftRole(userId, currentRole)
+    const profileRole = targetRole === "resident" ? "user" : targetRole
+
+    setRoleUpdateState((prev) => ({
+      ...prev,
+      [userId]: { loading: true, message: null, error: false },
+    }))
+
+    const result = await updateUserProfile(userId, { role: profileRole })
+    if (result.error) {
+      const errorMessage = result.error.message || "Failed to update role"
+      setRoleUpdateState((prev) => ({
+        ...prev,
+        [userId]: { loading: false, message: errorMessage, error: true },
+      }))
+      return
+    }
+
+    setRoleUpdateState((prev) => ({
+      ...prev,
+      [userId]: { loading: false, message: "Role updated successfully", error: false },
+    }))
+    await reloadData()
+    const listResult = await listProfiles()
+    if (!listResult.error) {
+      setDirectoryProfiles(listResult.data ?? [])
+    }
   }
 
   const handleAction = async (action: "approve" | "reject") => {
@@ -503,6 +593,53 @@ export default function AdminDashboard() {
                               <h3 className="font-medium text-foreground">{role.fullName}</h3>
                               <p className="text-sm text-muted-foreground">@{role.username} • {role.email}</p>
                               <p className="text-sm text-muted-foreground mt-1">{role.company}</p>
+                              <div className="mt-3 flex flex-wrap items-center gap-2">
+                                <span className="text-xs text-muted-foreground">Current:</span>
+                                <Badge variant="outline" className="text-xs">
+                                  {roleLabels[role.currentRole] ?? role.currentRole}
+                                </Badge>
+                                <span className="text-xs text-muted-foreground ml-2">Set role:</span>
+                                <select
+                                  value={getDraftRole(role.userId, role.currentRole)}
+                                  onChange={(event) => {
+                                    const nextRole = event.target.value as Role | "resident"
+                                    setRoleDrafts((prev) => ({ ...prev, [role.userId]: nextRole }))
+                                    setRoleUpdateState((prev) => ({
+                                      ...prev,
+                                      [role.userId]: { loading: false, message: null, error: false },
+                                    }))
+                                  }}
+                                  className="h-8 rounded-md border border-border bg-secondary px-2 text-xs text-foreground"
+                                >
+                                  {roleOptions.map((option) => (
+                                    <option key={option.value} value={option.value}>
+                                      {option.label}
+                                    </option>
+                                  ))}
+                                </select>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => void handleDirectRoleApply({
+                                    userId: role.userId,
+                                    currentRole: role.currentRole,
+                                  })}
+                                  disabled={roleUpdateState[role.userId]?.loading}
+                                  className="h-8"
+                                >
+                                  {roleUpdateState[role.userId]?.loading ? "Applying..." : "Apply role"}
+                                </Button>
+                              </div>
+                              {roleUpdateState[role.userId]?.message ? (
+                                <p
+                                  className={cn(
+                                    "mt-2 text-xs",
+                                    roleUpdateState[role.userId]?.error ? "text-red-400" : "text-green-400",
+                                  )}
+                                >
+                                  {roleUpdateState[role.userId]?.message}
+                                </p>
+                              ) : null}
                             </div>
                             <div className="flex flex-col items-end gap-1">
                               <Badge className={getStatusColor(role.status)}>
@@ -537,6 +674,113 @@ export default function AdminDashboard() {
                               Review
                             </Button>
                           </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )
+              })}
+            {roleRequests.filter(r =>
+              (statusFilter === "all" || r.status === statusFilter) &&
+              (r.fullName.toLowerCase().includes(searchQuery.toLowerCase()) || r.company.toLowerCase().includes(searchQuery.toLowerCase()))
+            ).length === 0 ? (
+              <Card className="bg-card border-border">
+                <CardContent className="p-4">
+                  <p className="text-sm text-muted-foreground">
+                    No role requests found. Showing user directory for direct role management.
+                  </p>
+                </CardContent>
+              </Card>
+            ) : null}
+
+            {directoryError ? (
+              <StatusMessage tone="error">{directoryError}</StatusMessage>
+            ) : null}
+            {directoryLoading ? (
+              <Card className="bg-card border-border">
+                <CardContent className="p-4 text-sm text-muted-foreground">Loading users...</CardContent>
+              </Card>
+            ) : null}
+            {directoryProfiles
+              .filter((item) => {
+                const q = searchQuery.toLowerCase()
+                return (
+                  item.fullName.toLowerCase().includes(q) ||
+                  item.email.toLowerCase().includes(q) ||
+                  item.companyName.toLowerCase().includes(q)
+                )
+              })
+              .map((item) => {
+                const currentRole = normalizeCurrentRole(item.role)
+                const nextRole = getDraftRole(item.id, currentRole)
+                return (
+                  <Card key={item.id} className="bg-card border-border">
+                    <CardContent className="p-4">
+                      <div className="flex items-start gap-4">
+                        <Avatar className="h-12 w-12 border-2 border-border">
+                          <AvatarImage src={item.avatarUrl} alt={item.fullName || item.email} />
+                          <AvatarFallback className="bg-secondary text-foreground">
+                            {(item.fullName || item.email || "U")
+                              .split(" ")
+                              .filter(Boolean)
+                              .slice(0, 2)
+                              .map((part) => part[0]?.toUpperCase() ?? "")
+                              .join("")}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-medium text-foreground">{item.fullName || "Unnamed user"}</h3>
+                          <p className="text-sm text-muted-foreground">{item.email}</p>
+                          {item.companyName ? (
+                            <p className="text-sm text-muted-foreground mt-1">{item.companyName}</p>
+                          ) : null}
+                          <div className="mt-3 flex flex-wrap items-center gap-2">
+                            <span className="text-xs text-muted-foreground">Current:</span>
+                            <Badge variant="outline" className="text-xs">
+                              {roleLabels[currentRole] ?? currentRole}
+                            </Badge>
+                            <span className="text-xs text-muted-foreground ml-2">Set role:</span>
+                            <select
+                              value={nextRole}
+                              onChange={(event) => {
+                                const selected = event.target.value as Role | "resident"
+                                setRoleDrafts((prev) => ({ ...prev, [item.id]: selected }))
+                                setRoleUpdateState((prev) => ({
+                                  ...prev,
+                                  [item.id]: { loading: false, message: null, error: false },
+                                }))
+                              }}
+                              className="h-8 rounded-md border border-border bg-secondary px-2 text-xs text-foreground"
+                            >
+                              {roleOptions.map((option) => (
+                                <option key={option.value} value={option.value}>
+                                  {option.label}
+                                </option>
+                              ))}
+                            </select>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => void handleDirectRoleApply({
+                                userId: item.id,
+                                currentRole,
+                              })}
+                              disabled={roleUpdateState[item.id]?.loading}
+                              className="h-8"
+                            >
+                              {roleUpdateState[item.id]?.loading ? "Applying..." : "Apply role"}
+                            </Button>
+                          </div>
+                          {roleUpdateState[item.id]?.message ? (
+                            <p
+                              className={cn(
+                                "mt-2 text-xs",
+                                roleUpdateState[item.id]?.error ? "text-red-400" : "text-green-400",
+                              )}
+                            >
+                              {roleUpdateState[item.id]?.message}
+                            </p>
+                          ) : null}
                         </div>
                       </div>
                     </CardContent>
