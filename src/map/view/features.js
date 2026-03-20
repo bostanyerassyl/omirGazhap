@@ -287,9 +287,6 @@ function getCurrentUserId() {
   }
 }
 
-// When a building is clicked, map.js sets this to true so the
-// draw.selectionchange handler that fires on the same click is ignored.
-
 function setActiveFeature(f) { activeFeature = f; }
 function setActiveDraw(d)    { activeDraw    = d; }
 
@@ -1128,7 +1125,6 @@ export async function setupDraw(map) {
   // Subscribe to Map Features updates from the simulator
   supabase.channel('map-features-sync')
     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: '"Map Features"' }, (payload) => {
-      console.log('Realtime Map Features UPDATE received:', payload.new);
       const dbId = payload.new?.id;
       if (!dbId) return;
       
@@ -1153,9 +1149,7 @@ export async function setupDraw(map) {
       if (currentFeat) draw.add(currentFeat);
       map.triggerRepaint();
     })
-    .subscribe((status) => {
-      console.log('Map Features realtime status:', status);
-    });
+    .subscribe();
 
   // Toolbar mode buttons
   document.querySelectorAll('.draw-btn').forEach(btn => {

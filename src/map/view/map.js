@@ -130,10 +130,35 @@ export async function initializeMapView() {
     return 'driving';
   };
 
+  const getUserLocation = () => new Promise((resolve) => {
+    if (!('geolocation' in navigator)) {
+      resolve(null);
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        resolve({
+          lng: Number(position.coords.longitude),
+          lat: Number(position.coords.latitude),
+        });
+      },
+      () => resolve(null),
+      {
+        enableHighAccuracy: true,
+        timeout: 6000,
+        maximumAge: 30000,
+      },
+    );
+  });
+
   const requestRoute = async ({ destination, mode }) => {
     try {
       const center = map.getCenter();
-      const start = [center.lng, center.lat];
+      const geo = await getUserLocation();
+      const start = geo
+        ? [geo.lng, geo.lat]
+        : [center.lng, center.lat];
       const geocoded = await geocodeDestination(destination);
       const end = [geocoded.lon, geocoded.lat];
 
@@ -322,7 +347,6 @@ export async function initializeMapView() {
       const selectedDrawFeatures = draw.getSelected().features;
 
       if (drawFeatureIds.length > 0) {
-        // Draw feature click should win over building layer under it
         const clickedFeature = draw.get(drawFeatureIds[0]);
         if (!clickedFeature) return;
         map.getSource('selected-source').setData(emptyFC());
@@ -331,7 +355,6 @@ export async function initializeMapView() {
       }
 
       if (buildingFeatures.length > 0) {
-        // Building click — ignore whatever draw just deselected
         const feature = buildingFeatures[0];
         const key = featureKey(feature);
         if (!key) return;
@@ -342,12 +365,10 @@ export async function initializeMapView() {
         openBuildingSidebar(key, feature.properties ?? {});
 
       } else if (selectedDrawFeatures.length > 0) {
-        // Draw feature click
         map.getSource('selected-source').setData(emptyFC());
         openFeatureSidebar(selectedDrawFeatures[0], draw, map);
 
       } else {
-        // Empty space
         map.getSource('selected-source').setData(emptyFC());
         closeSidebar();
       }

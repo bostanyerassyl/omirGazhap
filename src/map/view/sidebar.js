@@ -47,7 +47,6 @@ export const dom = {
     inputRoof: document.getElementById('prop-roof'),
     inputMinHeight: document.getElementById('prop-minheight'),
     featureSection: document.getElementById('feature-section'),
-    // Building-only sections
     buildingSections: [
         document.querySelector('.section:has(#desc-textarea)'),
         document.querySelector('.section:has(#tag-input)'),
@@ -55,10 +54,6 @@ export const dom = {
     ],
 };
 
-// ── RESET ─────────────────────────────────────────────────────────────────────
-// Call this at the top of EVERY open*Sidebar function.
-// Clears all stale content so switching between buildings/features/friends
-// never shows leftover data from the previous selection.
 export function resetSidebar() {
     state.activeContext = null;
     state.activeBanner = null;
@@ -79,12 +74,10 @@ export function resetSidebar() {
     dom.btnSave.disabled = false;
     dom.btnSave.onclick = null;
 
-    // Reset banner display
     dom.bannerImg.classList.remove('loaded');
     dom.bannerRemove.classList.remove('visible');
     dom.bannerImg.src = '';
 
-    // Show all sections by default — individual openers hide what they don't need
     dom.featureSection.style.display = 'none';
     dom.buildingSections.forEach(s => { if (s) s.style.display = ''; });
 
