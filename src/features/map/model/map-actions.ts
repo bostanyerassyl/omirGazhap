@@ -36,6 +36,10 @@ export type MapFilterState = {
   friends: boolean
   events: boolean
   buses: boolean
+  points: boolean
+  fire: boolean
+  water: boolean
+  electricity: boolean
 }
 
 export type MapPointPickResult = {
@@ -45,12 +49,22 @@ export type MapPointPickResult = {
   longitude?: number
 }
 
+export type DeveloperObjectMapItem = {
+  id: string
+  name: string
+  status: "planning" | "in-progress" | "completed" | "delayed"
+  latitude: number
+  longitude: number
+}
+
 type MapActionHandlers = {
   requestRoute: (payload: RouteRequest) => Promise<RouteResult>
   clearRoute: () => void
   addFriend: (payload: FriendCreateInput) => Promise<{ ok: boolean; error?: string }>
   addPoi: (payload: PoiCreateInput) => Promise<{ ok: boolean; error?: string }>
   setFilters: (payload: MapFilterState) => void
+  setDeveloperObjects: (items: DeveloperObjectMapItem[]) => void
+  focusDeveloperObject: (item: DeveloperObjectMapItem | null) => void
   pickPoint: () => Promise<MapPointPickResult>
   getMapCenter: () => { latitude: number; longitude: number } | null
 }
@@ -63,6 +77,8 @@ let handlers: MapActionHandlers = {
   addFriend: noopAsync,
   addPoi: noopAsync,
   setFilters: () => {},
+  setDeveloperObjects: () => {},
+  focusDeveloperObject: () => {},
   pickPoint: async () => ({ ok: false, error: "Map is not ready yet" }),
   getMapCenter: () => null,
 }
@@ -73,6 +89,10 @@ let latestFilters: MapFilterState = {
   friends: true,
   events: true,
   buses: true,
+  points: true,
+  fire: true,
+  water: true,
+  electricity: true,
 }
 
 export function registerMapActionHandlers(next: Partial<MapActionHandlers>) {
@@ -87,6 +107,8 @@ export function registerMapActionHandlers(next: Partial<MapActionHandlers>) {
       addFriend: noopAsync,
       addPoi: noopAsync,
       setFilters: () => {},
+      setDeveloperObjects: () => {},
+      focusDeveloperObject: () => {},
       pickPoint: async () => ({ ok: false, error: "Map is not ready yet" }),
       getMapCenter: () => null,
     }
@@ -120,4 +142,27 @@ export function pickPointOnMap() {
 
 export function getMapCenterPosition() {
   return handlers.getMapCenter()
+}
+
+const developerObjectClickListeners = new Set<(id: string) => void>()
+
+export function setDeveloperObjectsOnMap(items: DeveloperObjectMapItem[]) {
+  handlers.setDeveloperObjects(items)
+}
+
+export function focusDeveloperObjectOnMap(item: DeveloperObjectMapItem | null) {
+  handlers.focusDeveloperObject(item)
+}
+
+export function onDeveloperObjectMapClick(listener: (id: string) => void) {
+  developerObjectClickListeners.add(listener)
+  return () => {
+    developerObjectClickListeners.delete(listener)
+  }
+}
+
+export function emitDeveloperObjectMapClick(id: string) {
+  for (const listener of developerObjectClickListeners) {
+    listener(id)
+  }
 }

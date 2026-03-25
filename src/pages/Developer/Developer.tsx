@@ -8,6 +8,7 @@ import { DeveloperMap } from "@/components/developer/developer-map"
 import { DeveloperProfile } from "@/components/developer/developer-profile"
 import { useDashboardData } from "@/features/dashboard/model/useDashboardData"
 import { useAuth } from "@/features/auth/model/AuthProvider"
+import { pickPointOnMap } from "@/features/map/model/map-actions"
 import type { ConstructionObject } from "@/types/dashboard"
 import {
   Dialog,
@@ -28,7 +29,11 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 
-function createDraftObject(developerName: string, phone: string): ConstructionObject {
+function createDraftObjectWithCoordinates(
+  developerName: string,
+  phone: string,
+  coordinates: { lat: number; lng: number },
+): ConstructionObject {
   const deadline = new Date()
   deadline.setDate(deadline.getDate() + 90)
 
@@ -37,17 +42,14 @@ function createDraftObject(developerName: string, phone: string): ConstructionOb
     locationId: null,
     type: "residential complex",
     name: "",
-    address: "",
     description: "",
     contactPhone: phone,
     developerName,
     status: "planning",
     deadline: deadline.toISOString().slice(0, 10),
     progress: 0,
-    coordinates: {
-      lat: 43.238949,
-      lng: 76.889709,
-    },
+    coordinates,
+    address: `Selected point (${coordinates.lat.toFixed(5)}, ${coordinates.lng.toFixed(5)})`,
     reports: [],
   }
 }
@@ -71,6 +73,7 @@ export default function DeveloperDashboard() {
   const [reportSuccess, setReportSuccess] = useState<string | null>(null)
   const [reporting, setReporting] = useState(false)
   const [savingObject, setSavingObject] = useState(false)
+  const [isPickingLocation, setIsPickingLocation] = useState(false)
   const [objectError, setObjectError] = useState<string | null>(null)
   const [reportForm, setReportForm] = useState({
     objectId: "",
@@ -91,9 +94,19 @@ export default function DeveloperDashboard() {
     setIsEditorOpen(true)
   }
 
-  const handleAddObject = () => {
+  const handleAddObject = async () => {
     setEditorMode("create")
-    setSelectedObject(createDraftObject(developerName, developerPhone))
+    setIsPickingLocation(true)
+    const picked = await pickPointOnMap()
+    setIsPickingLocation(false)
+    const hasPickedCoords =
+      picked.ok &&
+      typeof picked.latitude === "number" &&
+      typeof picked.longitude === "number"
+    const coordinates = hasPickedCoords
+      ? { lat: picked.latitude as number, lng: picked.longitude as number }
+      : { lat: 43.238949, lng: 76.889709 }
+    setSelectedObject(createDraftObjectWithCoordinates(developerName, developerPhone, coordinates))
     setObjectError(null)
     setIsEditorOpen(true)
   }
@@ -170,6 +183,7 @@ export default function DeveloperDashboard() {
       <DeveloperMap 
         objects={objects}
         selectedObject={selectedObject}
+        onSelectObject={handleSelectObject}
       />
 
       {/* Top Bar */}
@@ -190,7 +204,7 @@ export default function DeveloperDashboard() {
               <ObjectsList 
                 objects={objects}
                 onSelectObject={handleSelectObject}
-                onAddObject={handleAddObject}
+                onAddObject={() => void handleAddObject()}
                 selectedObjectId={selectedObject?.id}
               />
             </div>
@@ -244,6 +258,12 @@ export default function DeveloperDashboard() {
           />
         </>
       )}
+
+      {isPickingLocation ? (
+        <div className="absolute top-24 left-1/2 z-30 -translate-x-1/2 rounded-xl border border-slate-400/20 bg-slate-950/80 px-4 py-2 text-sm text-slate-100 shadow-lg shadow-black/30 backdrop-blur-sm">
+          Click on the map to choose the project location
+        </div>
+      ) : null}
 
       <Dialog open={reportOpen} onOpenChange={setReportOpen}>
         <DialogContent>

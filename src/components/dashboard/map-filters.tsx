@@ -1,4 +1,4 @@
-import { Accessibility, Bike, Users, Calendar, Bus } from "lucide-react"
+import { Accessibility, Bike, Users, Calendar, Bus, MapPin, Flame, Droplets, Zap } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/utils/cn"
 
@@ -8,6 +8,10 @@ interface FilterState {
   friends: boolean
   events: boolean
   buses: boolean
+  points: boolean
+  fire: boolean
+  water: boolean
+  electricity: boolean
 }
 
 interface MapFiltersProps {
@@ -16,6 +20,10 @@ interface MapFiltersProps {
 }
 
 const filterOptions: { key: keyof FilterState; icon: React.ReactNode; label: string; color: string }[] = [
+  { key: "points", icon: <MapPin className="size-4" />, label: "Points", color: "bg-violet-500" },
+  { key: "fire", icon: <Flame className="size-4" />, label: "Fire", color: "bg-red-500" },
+  { key: "water", icon: <Droplets className="size-4" />, label: "Water", color: "bg-sky-500" },
+  { key: "electricity", icon: <Zap className="size-4" />, label: "Electricity", color: "bg-yellow-500" },
   { key: "ramps", icon: <Accessibility className="size-4" />, label: "Ramps", color: "bg-blue-500" },
   { key: "scooters", icon: <Bike className="size-4" />, label: "Scooters", color: "bg-green-500" },
   { key: "friends", icon: <Users className="size-4" />, label: "Friends", color: "bg-pink-500" },
@@ -53,4 +61,3 @@ export function MapFilters({ filters, onFilterChange }: MapFiltersProps) {
     </div>
   )
 }
-

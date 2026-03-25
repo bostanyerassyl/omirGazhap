@@ -16,6 +16,14 @@ const knownAssetIds = new Set();
 const missingAssetIds = new Set();
 let assetsAccessBlocked = false;
 let observationsAccessBlocked = false;
+let mapRef = null;
+let drawRef = null;
+const pointFilters = {
+  points: true,
+  fire: true,
+  water: true,
+  electricity: true,
+};
 const DRAW_STYLES = [
   {
     id: 'gl-draw-polygon-fill',
@@ -49,10 +57,15 @@ const DRAW_STYLES = [
     type: 'circle',
     filter: ['all', ['==', '$type', 'Point'], ['!=', 'meta', 'midpoint'], ['!=', 'mode', 'static']],
     paint: {
-      'circle-radius': 6,
-      'circle-color': ['coalesce', ['get', 'user_color'], ['get', 'color'], DEFAULT_FEATURE_COLOR],
-      'circle-stroke-color': '#ffffff',
-      'circle-stroke-width': 1.5,
+      'circle-radius': ['case', ['==', ['coalesce', ['get', 'user_point_hidden'], ['get', 'point_hidden'], false], true], 0, 6],
+      'circle-color': [
+        'case',
+        ['==', ['coalesce', ['get', 'user_point_hidden'], ['get', 'point_hidden'], false], true],
+        'rgba(0,0,0,0)',
+        ['coalesce', ['get', 'user_color'], ['get', 'color'], DEFAULT_FEATURE_COLOR],
+      ],
+      'circle-stroke-color': ['case', ['==', ['coalesce', ['get', 'user_point_hidden'], ['get', 'point_hidden'], false], true], 'rgba(0,0,0,0)', '#ffffff'],
+      'circle-stroke-width': ['case', ['==', ['coalesce', ['get', 'user_point_hidden'], ['get', 'point_hidden'], false], true], 0, 1.5],
     },
   },
   {
@@ -112,6 +125,25 @@ function getCoordKey(geometry) {
   const [lng, lat] = geometry.coordinates;
   if (!Number.isFinite(lng) || !Number.isFinite(lat)) return null;
   return `${Number(lng).toFixed(6)},${Number(lat).toFixed(6)}`;
+}
+
+function getPointCategory(iconValue) {
+  const icon = String(iconValue ?? '').trim().toLowerCase();
+  if (!icon) return 'other';
+  if (icon === '🔥' || icon.includes('fire') || icon.includes('flame')) return 'fire';
+  if (icon === '💦' || icon === '💧' || icon.includes('water') || icon.includes('droplet')) return 'water';
+  if (icon === '⚡' || icon.includes('electric') || icon.includes('power') || icon.includes('zap')) return 'electricity';
+  return 'other';
+}
+
+function isPointFeatureHidden(feature) {
+  if (!feature || feature.geometry?.type !== 'Point') return false;
+  if (!pointFilters.points) return true;
+  const category = getPointCategory(feature?.properties?.icon);
+  if (category === 'fire' && !pointFilters.fire) return true;
+  if (category === 'water' && !pointFilters.water) return true;
+  if (category === 'electricity' && !pointFilters.electricity) return true;
+  return false;
 }
 
 function resolveFeatureDbId(feature) {
@@ -287,9 +319,6 @@ function getCurrentUserId() {
   }
 }
 
-// When a building is clicked, map.js sets this to true so the
-// draw.selectionchange handler that fires on the same click is ignored.
-
 function setActiveFeature(f) { activeFeature = f; }
 function setActiveDraw(d)    { activeDraw    = d; }
 
@@ -438,6 +467,10 @@ export function updateIconMarker(map, featureId, lngLat, icon, iconUrl) {
 
   const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
     .setLngLat(lngLat).addTo(map);
+  const feature = drawRef?.get(featureId);
+  if (feature && isPointFeatureHidden(feature)) {
+    marker.getElement().style.display = 'none';
+  }
   iconMarkers.set(featureId, marker);
 }
 
@@ -463,6 +496,35 @@ function syncPointIconMarkers(draw, map) {
     marker.remove();
     iconMarkers.delete(featureId);
   }
+}
+
+function applyPointFilters() {
+  if (!drawRef) return;
+  const all = drawRef.getAll?.();
+  const features = Array.isArray(all?.features) ? all.features : [];
+
+  for (const feature of features) {
+    if (feature?.geometry?.type !== 'Point') continue;
+    const hidden = isPointFeatureHidden(feature);
+    safeSetFeatureProperty(drawRef, feature.id, 'point_hidden', hidden);
+  }
+
+  if (mapRef) {
+    for (const [featureId, marker] of iconMarkers.entries()) {
+      const feature = drawRef.get(featureId);
+      if (!feature || feature.geometry?.type !== 'Point') continue;
+      marker.getElement().style.display = isPointFeatureHidden(feature) ? 'none' : '';
+    }
+    mapRef.triggerRepaint();
+  }
+}
+
+export function setFeaturePointFilters(next = {}) {
+  pointFilters.points = next.points ?? pointFilters.points;
+  pointFilters.fire = next.fire ?? pointFilters.fire;
+  pointFilters.water = next.water ?? pointFilters.water;
+  pointFilters.electricity = next.electricity ?? pointFilters.electricity;
+  applyPointFilters();
 }
 
 // ── SIDEBAR ───────────────────────────────────────────────────────────────────
@@ -1100,6 +1162,8 @@ export async function setupDraw(map) {
 
   map.addControl(draw);
   setActiveDraw(draw);
+  mapRef = map;
+  drawRef = draw;
 
   // Live color preview
   document.getElementById('feature-color').addEventListener('input', e => {
@@ -1122,13 +1186,13 @@ export async function setupDraw(map) {
       }
     }
   }
+  applyPointFilters();
 
   await initTrafficLights({ draw, map });
 
   // Subscribe to Map Features updates from the simulator
   supabase.channel('map-features-sync')
     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: '"Map Features"' }, (payload) => {
-      console.log('Realtime Map Features UPDATE received:', payload.new);
       const dbId = payload.new?.id;
       if (!dbId) return;
       
@@ -1151,11 +1215,10 @@ export async function setupDraw(map) {
       // Force Mapbox Draw to re-eval styles and MapLibre to repaint
       const currentFeat = draw.get(drawId);
       if (currentFeat) draw.add(currentFeat);
+      applyPointFilters();
       map.triggerRepaint();
     })
-    .subscribe((status) => {
-      console.log('Map Features realtime status:', status);
-    });
+    .subscribe();
 
   // Toolbar mode buttons
   document.querySelectorAll('.draw-btn').forEach(btn => {
@@ -1194,6 +1257,7 @@ export async function setupDraw(map) {
     }
     await saveFeature(feature);
     syncPointIconMarkers(draw, map);
+    applyPointFilters();
     openFeatureSidebar(feature, draw, map);
   });
 
@@ -1215,17 +1279,21 @@ export async function setupDraw(map) {
       }
     }
     syncPointIconMarkers(draw, map);
+    applyPointFilters();
   });
 
   map.on('draw.delete', () => {
     syncPointIconMarkers(draw, map);
+    applyPointFilters();
   });
 
   map.on('idle', () => {
     syncPointIconMarkers(draw, map);
+    applyPointFilters();
   });
 
   syncPointIconMarkers(draw, map);
+  applyPointFilters();
   return draw;
   
 }
@@ -1249,6 +1317,7 @@ function setupIconPicker(map, draw) {
         updateIconMarker(map, activeFeature.id,
           activeFeature.geometry.coordinates, icon, null);
       }
+      applyPointFilters();
       const dbId = resolveFeatureDbId(activeFeature);
       if (dbId) setupTrafficLightUI({ dbId, draw, map, feature: activeFeature });
     });
@@ -1274,6 +1343,7 @@ function setupIconPicker(map, draw) {
       updateIconMarker(map, activeFeature.id,
         activeFeature.geometry.coordinates, 'custom', data.publicUrl);
     }
+    applyPointFilters();
     const dbId = resolveFeatureDbId(activeFeature);
     if (dbId) setupTrafficLightUI({ dbId, draw, map, feature: activeFeature });
   });

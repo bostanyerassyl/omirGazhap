@@ -1,10 +1,10 @@
 import maplibregl from 'maplibre-gl';
 import { openBuildingSidebar } from './buildings.js';
-import { openFeatureSidebar, setupDraw } from './features.js';
+import { openFeatureSidebar, setFeaturePointFilters, setupDraw } from './features.js';
 import { addFriend, loadFriends, setFriendsVisibility, teardownFriends } from './friends.js';
 import { addPoi, loadPoi, setPoiVisibility, teardownPoi } from './poi.js';
 import { closeSidebar } from './sidebar.js';
-import { registerMapActionHandlers } from '../../features/map/model/map-actions';
+import { emitDeveloperObjectMapClick, registerMapActionHandlers } from '../../features/map/model/map-actions';
 import { teardownTrafficLights } from './traffic-lights.js';
 
 function featureKey(feature) {
@@ -49,6 +49,54 @@ export async function initializeMapView() {
   let navEndMarker = null;
   let unregisterActions = null;
   let pendingPointPick = null;
+  const developerMarkers = new Map();
+
+  const statusColor = (status) => {
+    if (status === 'completed') return '#10b981';
+    if (status === 'delayed') return '#ef4444';
+    if (status === 'planning') return '#3b82f6';
+    return '#f59e0b';
+  };
+
+  const clearDeveloperMarkers = () => {
+    for (const marker of developerMarkers.values()) marker.remove();
+    developerMarkers.clear();
+  };
+
+  const setDeveloperObjects = (items = []) => {
+    const nextIds = new Set(items.map((item) => item.id));
+    for (const [id, marker] of developerMarkers.entries()) {
+      if (nextIds.has(id)) continue;
+      marker.remove();
+      developerMarkers.delete(id);
+    }
+
+    for (const item of items) {
+      if (!Number.isFinite(item.latitude) || !Number.isFinite(item.longitude)) continue;
+      const existing = developerMarkers.get(item.id);
+      if (existing) {
+        existing.setLngLat([item.longitude, item.latitude]);
+        const el = existing.getElement();
+        el.style.borderColor = statusColor(item.status);
+        el.title = `${item.name} (${item.status})`;
+        continue;
+      }
+      const el = document.createElement('button');
+      el.type = 'button';
+      el.className = 'developer-object-marker';
+      el.style.borderColor = statusColor(item.status);
+      el.title = `${item.name} (${item.status})`;
+      el.innerHTML = '<span class="developer-object-dot"></span>';
+      el.addEventListener('click', (event) => {
+        event.stopPropagation();
+        emitDeveloperObjectMapClick(item.id);
+      });
+      const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
+        .setLngLat([item.longitude, item.latitude])
+        .addTo(map);
+      developerMarkers.set(item.id, marker);
+    }
+  };
 
   const clearRoute = () => {
     if (map.getLayer('nav-route-line')) map.removeLayer('nav-route-line');
@@ -82,10 +130,35 @@ export async function initializeMapView() {
     return 'driving';
   };
 
+  const getUserLocation = () => new Promise((resolve) => {
+    if (!('geolocation' in navigator)) {
+      resolve(null);
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        resolve({
+          lng: Number(position.coords.longitude),
+          lat: Number(position.coords.latitude),
+        });
+      },
+      () => resolve(null),
+      {
+        enableHighAccuracy: true,
+        timeout: 6000,
+        maximumAge: 30000,
+      },
+    );
+  });
+
   const requestRoute = async ({ destination, mode }) => {
     try {
       const center = map.getCenter();
-      const start = [center.lng, center.lat];
+      const geo = await getUserLocation();
+      const start = geo
+        ? [geo.lng, geo.lat]
+        : [center.lng, center.lat];
       const geocoded = await geocodeDestination(destination);
       const end = [geocoded.lon, geocoded.lat];
 
@@ -162,9 +235,26 @@ export async function initializeMapView() {
         longitude: Number.isFinite(longitude) ? longitude : center.lng,
       });
     },
-    setFilters: ({ ramps, scooters, friends, events, buses }) => {
+    setFilters: ({ ramps, scooters, friends, events, buses, points, fire, water, electricity }) => {
       setFriendsVisibility(friends);
       setPoiVisibility({ ramps, scooters, events, buses });
+      setFeaturePointFilters({
+        points: points ?? true,
+        fire: fire ?? true,
+        water: water ?? true,
+        electricity: electricity ?? true,
+      });
+    },
+    setDeveloperObjects: (items) => {
+      setDeveloperObjects(items ?? []);
+    },
+    focusDeveloperObject: (item) => {
+      if (!item || !Number.isFinite(item.latitude) || !Number.isFinite(item.longitude)) return;
+      map.flyTo({
+        center: [item.longitude, item.latitude],
+        zoom: Math.max(15, map.getZoom()),
+        duration: 600,
+      });
     },
     pickPoint: async () => {
       if (pendingPointPick) {
@@ -263,8 +353,9 @@ export async function initializeMapView() {
       const selectedDrawFeatures = draw.getSelected().features;
 
       if (drawFeatureIds.length > 0) {
-        // Draw feature click should win over building layer under it
-        const clickedFeature = draw.get(drawFeatureIds[0]);
+        const clickedFeature = drawFeatureIds
+          .map((id) => draw.get(id))
+          .find((item) => item && item.properties?.point_hidden !== true);
         if (!clickedFeature) return;
         map.getSource('selected-source').setData(emptyFC());
         openFeatureSidebar(clickedFeature, draw, map);
@@ -272,7 +363,6 @@ export async function initializeMapView() {
       }
 
       if (buildingFeatures.length > 0) {
-        // Building click — ignore whatever draw just deselected
         const feature = buildingFeatures[0];
         const key = featureKey(feature);
         if (!key) return;
@@ -282,13 +372,13 @@ export async function initializeMapView() {
         });
         openBuildingSidebar(key, feature.properties ?? {});
 
-      } else if (selectedDrawFeatures.length > 0) {
-        // Draw feature click
+      } else if (selectedDrawFeatures.some((item) => item?.properties?.point_hidden !== true)) {
+        const selectedVisibleFeature = selectedDrawFeatures.find((item) => item?.properties?.point_hidden !== true);
+        if (!selectedVisibleFeature) return;
         map.getSource('selected-source').setData(emptyFC());
-        openFeatureSidebar(selectedDrawFeatures[0], draw, map);
+        openFeatureSidebar(selectedVisibleFeature, draw, map);
 
       } else {
-        // Empty space
         map.getSource('selected-source').setData(emptyFC());
         closeSidebar();
       }
@@ -300,6 +390,7 @@ export async function initializeMapView() {
 
   return () => {
     clearRoute();
+    clearDeveloperMarkers();
     teardownFriends();
     teardownPoi();
     teardownTrafficLights();

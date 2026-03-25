@@ -13,6 +13,13 @@ type LocationRecord = {
   created_at: string | null
 }
 
+type LocationCreateInput = {
+  name: string
+  zone?: LocationZone
+  lat: number
+  lon: number
+}
+
 function mapLocation(record: LocationRecord): LocationItem {
   return {
     id: record.id,
@@ -47,6 +54,41 @@ export const locationService = {
     } catch (error) {
       const normalizedError = toError(error)
       logger.error(normalizedError, 'location.list')
+
+      return {
+        data: null,
+        error: normalizedError,
+      }
+    }
+  },
+
+  async create(input: LocationCreateInput): Promise<AuthResult<LocationItem>> {
+    try {
+      const { data, error } = await supabase
+        .from('locations')
+        .insert({
+          name: input.name,
+          zone: input.zone ?? 'Growing',
+          lat: input.lat,
+          lon: input.lon,
+        })
+        .select('*')
+        .single<LocationRecord>()
+
+      if (error) {
+        return {
+          data: null,
+          error,
+        }
+      }
+
+      return {
+        data: mapLocation(data),
+        error: null,
+      }
+    } catch (error) {
+      const normalizedError = toError(error)
+      logger.error(normalizedError, 'location.create')
 
       return {
         data: null,

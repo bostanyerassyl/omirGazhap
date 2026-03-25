@@ -73,6 +73,10 @@ export default function DashboardPage() {
     friends: true,
     events: true,
     buses: true,
+    points: true,
+    fire: true,
+    water: true,
+    electricity: true,
   })
 
   return (
@@ -133,7 +137,7 @@ export default function DashboardPage() {
       <MapFilters filters={filters} onFilterChange={setFilters} />
 
       {/* Main map */}
-      <CityMap filters={filters} dynamicMarkers={data?.mapMarkers ?? []} />
+      <CityMap filters={filters} />
 
       {error ? (
         <div className="absolute left-4 right-4 top-20 z-30 md:left-auto md:right-4 md:w-[420px]">

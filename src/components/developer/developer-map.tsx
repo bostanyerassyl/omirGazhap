@@ -1,10 +1,17 @@
+import { useEffect } from "react"
 import { InteractiveMapView } from "@/components/map/interactive-map-view"
 import { Building2, CheckCircle2, Clock, AlertCircle } from "lucide-react"
 import type { ConstructionObject } from "@/types/dashboard"
+import {
+  focusDeveloperObjectOnMap,
+  onDeveloperObjectMapClick,
+  setDeveloperObjectsOnMap,
+} from "@/features/map/model/map-actions"
 
 interface DeveloperMapProps {
   objects: ConstructionObject[]
   selectedObject?: ConstructionObject
+  onSelectObject: (obj: ConstructionObject) => void
 }
 
 const statusColors: Record<ConstructionObject["status"], string> = {
@@ -21,10 +28,43 @@ const statusIcons = {
   delayed: AlertCircle,
 }
 
-export function DeveloperMap({ objects, selectedObject }: DeveloperMapProps) {
+export function DeveloperMap({ objects, selectedObject, onSelectObject }: DeveloperMapProps) {
+  useEffect(() => {
+    const items = objects.map((object) => ({
+      id: object.id,
+      name: object.name,
+      status: object.status,
+      latitude: object.coordinates.lat,
+      longitude: object.coordinates.lng,
+    }))
+    setDeveloperObjectsOnMap(items)
+    return () => {
+      setDeveloperObjectsOnMap([])
+    }
+  }, [objects])
+
+  useEffect(() => {
+    const unsubscribe = onDeveloperObjectMapClick((id) => {
+      const found = objects.find((object) => object.id === id)
+      if (found) onSelectObject(found)
+    })
+    return unsubscribe
+  }, [objects, onSelectObject])
+
+  useEffect(() => {
+    if (!selectedObject) return
+    focusDeveloperObjectOnMap({
+      id: selectedObject.id,
+      name: selectedObject.name,
+      status: selectedObject.status,
+      latitude: selectedObject.coordinates.lat,
+      longitude: selectedObject.coordinates.lng,
+    })
+  }, [selectedObject])
+
   return (
     <div className="absolute inset-0 bg-background">
-      <InteractiveMapView toolbarTop={132} />
+      <InteractiveMapView toolbarTop={132} showDrawToolbar={false} />
 
       <div className="absolute bottom-24 right-4 z-20 rounded-xl border border-slate-400/30 bg-slate-950/80 p-3 text-slate-100 shadow-xl shadow-black/35 backdrop-blur-md">
         <h4 className="mb-2 text-xs font-semibold text-slate-100">Status Legend</h4>

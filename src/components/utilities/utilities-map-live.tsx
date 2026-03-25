@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+import { useMemo, useState, useId } from "react"
 import { Building2, MapPin } from "lucide-react"
 import type { UtilitiesDistrictMetric } from "@/types/dashboard"
 import { cn } from "@/utils/cn"
@@ -17,20 +17,28 @@ function getConsumptionColor(value: number) {
 }
 
 function buildDistrictLayout(districts: UtilitiesDistrictMetric[]) {
-  const baseLayout = [
-    { x: 10, y: 16, width: 24, height: 20 },
-    { x: 38, y: 18, width: 22, height: 24 },
-    { x: 63, y: 15, width: 22, height: 22 },
-    { x: 18, y: 44, width: 22, height: 24 },
-    { x: 44, y: 48, width: 24, height: 22 },
-    { x: 71, y: 46, width: 18, height: 24 },
-  ]
+  const cols = Math.ceil(Math.sqrt(districts.length))
+  const rows = Math.ceil(districts.length / cols)
+  const cellW = 90 / cols
+  const cellH = 70 / rows
+  const pad = 1.5
 
   return districts.map((district, index) => ({
     ...district,
-    ...baseLayout[index % baseLayout.length],
+    x: 5 + (index % cols) * cellW,
+    y: 15 + Math.floor(index / cols) * cellH,
+    width: cellW - pad * 2,
+    height: cellH - pad * 2,
   }))
 }
+
+function formatDistrictLabel(name: string, width: number) {
+  const value = String(name ?? "").trim()
+  const maxChars = Math.max(4, Math.floor(width * 0.6))
+  if (value.length <= maxChars) return value
+  return `${value.slice(0, Math.max(3, maxChars - 1))}…`
+}
+
 
 export function UtilitiesMapLive({
   onDistrictSelect,
@@ -38,9 +46,11 @@ export function UtilitiesMapLive({
   resource,
   districts,
 }: UtilitiesMapLiveProps) {
+  const uid = useId() 
   const [hoveredDistrict, setHoveredDistrict] = useState<string | null>(null)
   const layout = useMemo(() => buildDistrictLayout(districts), [districts])
 
+   const clipId = (id: string) => `district-clip-${uid}-${id}`
   return (
     <div className="relative h-[400px] w-full overflow-hidden rounded-lg border border-border bg-card">
       <div className="absolute inset-0 opacity-20">
@@ -55,6 +65,19 @@ export function UtilitiesMapLive({
       </div>
 
       <svg viewBox="0 0 100 100" className="h-full w-full" preserveAspectRatio="xMidYMid meet">
+        <defs>
+          {layout.map((district) => (
+            <clipPath key={clipId(district.id)} id={clipId(district.id)}>
+              <rect
+                x={district.x + 0.8}
+                y={district.y + 0.8}
+                width={Math.max(0, district.width - 1.6)}
+                height={Math.max(0, district.height - 1.6)}
+                rx="2"
+              />
+            </clipPath>
+          ))}
+        </defs>
         {layout.map((district) => (
           <g key={district.id}>
             <rect
@@ -74,24 +97,26 @@ export function UtilitiesMapLive({
               onMouseEnter={() => setHoveredDistrict(district.id)}
               onMouseLeave={() => setHoveredDistrict(null)}
             />
-            <text
-              x={district.x + district.width / 2}
-              y={district.y + district.height / 2}
-              textAnchor="middle"
-              dominantBaseline="middle"
-              className="pointer-events-none fill-foreground text-[3px] font-medium"
-            >
-              {district.name}
-            </text>
-            <text
-              x={district.x + district.width / 2}
-              y={district.y + district.height / 2 + 4}
-              textAnchor="middle"
-              dominantBaseline="middle"
-              className="pointer-events-none fill-muted-foreground text-[2.5px]"
-            >
-              {district.consumption}%
-            </text>
+            <g clipPath={`url(#${clipId(district.id)})`}>
+              <text
+                x={district.x + district.width / 2}
+                y={district.y + district.height / 2}
+                textAnchor="middle"
+                dominantBaseline="middle"
+                className="pointer-events-none fill-foreground text-[3px] font-medium"
+              >
+                {formatDistrictLabel(district.name, district.width)}
+              </text>
+              <text
+                x={district.x + district.width / 2}
+                y={district.y + district.height / 2 + 4}
+                textAnchor="middle"
+                dominantBaseline="middle"
+                className="pointer-events-none fill-muted-foreground text-[2.5px]"
+              >
+                {district.consumption}%
+              </text>
+            </g>
           </g>
         ))}
       </svg>
@@ -130,5 +155,6 @@ export function UtilitiesMapLive({
         <span className="text-sm font-medium text-foreground">Alatau City</span>
       </div>
     </div>
+    
   )
 }

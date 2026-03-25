@@ -1342,6 +1342,7 @@ function buildRoleRequests(
 
     return {
       id: item.id,
+      userId: item.user_id,
       username,
       fullName,
       email,

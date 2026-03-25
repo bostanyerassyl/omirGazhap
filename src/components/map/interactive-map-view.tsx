@@ -6,20 +6,12 @@ import { useAuth } from "@/features/auth/model/AuthProvider"
 
 interface InteractiveMapViewProps {
   toolbarTop?: number
+  showDrawToolbar?: boolean
 }
 
-export function InteractiveMapView({ toolbarTop = 84 }: InteractiveMapViewProps) {
+export function InteractiveMapView({ toolbarTop = 84, showDrawToolbar }: InteractiveMapViewProps) {
   const { role } = useAuth()
-  const resolvedRole = role ?? ""
-  const canEditMap = new Set([
-    "admin",
-    "akimat",
-    "government_official",
-    "government-official",
-    "developer",
-    "utilities",
-    "industrialist",
-  ]).has(resolvedRole)
+  const canEditMap = Boolean(showDrawToolbar)
 
   useEffect(() => {
     let teardown: null | (() => void) = null
@@ -92,6 +84,9 @@ export function InteractiveMapView({ toolbarTop = 84 }: InteractiveMapViewProps)
                   <button className="icon-btn" data-icon="🚦">🚦</button>
                   <button className="icon-btn" data-icon="🔴">🔴</button>
                   <button className="icon-btn" data-icon="🟢">🟢</button>
+                  <button className="icon-btn" data-icon="🔥">🔥</button>
+                  <button className="icon-btn" data-icon="💦">💦</button>
+                  <button className="icon-btn" data-icon="⚡">⚡</button>
                   <button className="icon-btn" data-icon="custom">Custom</button>
                 </div>
                 <input type="file" id="icon-upload" accept="image/*,.svg" style={{ display: "none" }} />
