@@ -15,6 +15,7 @@ import { eventService } from '@/services/domain/eventService'
 import { observationService } from '@/services/domain/observationService'
 import { getDashboardData } from '@/services/data/dashboardDataService'
 import { logger } from '@/services/logger'
+import { supabase } from '@/services/supabaseClient'
 import type { AuthResult } from '@/types/auth'
 import type {
   AdminReviewAction,
@@ -109,7 +110,26 @@ export function AppDataProvider({ children }: PropsWithChildren) {
 
   useEffect(() => {
     void loadData()
-  }, [loadData])
+
+    if (role !== 'akimat' && role !== 'admin') return
+
+    const channel = supabase
+      .channel('dashboard-sync')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'cases' }, () => {
+        void loadData()
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'events' }, () => {
+        void loadData()
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'observations' }, () => {
+        void loadData()
+      })
+      .subscribe()
+
+    return () => {
+      void supabase.removeChannel(channel)
+    }
+  }, [loadData, role])
 
   const value = useMemo<AppDataContextValue>(
     () => ({
